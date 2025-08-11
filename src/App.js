@@ -20,8 +20,8 @@ const getBaseURL = () => {
   }
   // In Replit environment, check if we're running on replit.dev domain
   if (window.location.hostname.includes('replit.dev')) {
-    // Use the main domain without port for external access
-    return `${window.location.protocol}//${window.location.hostname}`;
+    // Use port 3002 which is mapped to internal port 5001 in .replit
+    return `${window.location.protocol}//${window.location.hostname}:3002`;
   }
   // Fallback for local development
   return 'http://localhost:5001';
