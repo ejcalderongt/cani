@@ -11,11 +11,7 @@ mode = "sequential"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "node server.js"
-
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "npm start"
+args = "npm run dev"
 
 [[workflows.workflow]]
 name = "Production Server"
