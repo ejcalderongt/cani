@@ -1,0 +1,119 @@
+Actúa como un experto en UI/UX para aplicaciones médicas y refactoriza el frontend de una app web (HTML/CSS/JS o React) alojada en Replit, priorizando claridad clínica, accesibilidad y rendimiento. Entrega código listo y recomendaciones. Mantén toda la lógica existente; solo mejora estilos, layout y componentes.
+
+Objetivo general
+
+    Dar una apariencia profesional tipo sistema hospitalario moderno: limpio, sobrio, legible, con jerarquía clara y estados de interacción consistentes.
+
+    Optimizar para desktop primero con responsive perfecto en tablet y móvil.
+
+Stack visual
+
+    Usar Tailwind CSS (preferido) o CSS variables; si React, puedes usar shadcn/ui para componentes base.
+
+    Implementar tokens de diseño (CSS variables) y clases utilitarias.
+
+Paleta y tokens
+
+    Fondo: --bg: #F7FAFC (claro), --bg-elev: #FFFFFF
+
+    Primario (confianza): --primary: #0F766E
+
+    Secundario (acciones suaves): --secondary: #2563EB
+
+    Estado éxito: --success: #10B981; alerta: --warning: #F59E0B; error: --error: #EF4444
+
+    Texto: --text: #0F172A; texto secundario: --muted: #475569
+
+    Bordes/sombras: --border: #E5E7EB; sombra suave: --shadow: 0 6px 24px rgba(15,23,42,.06)
+
+    Modo oscuro opcional con prefers-color-scheme, invirtiendo fondos y elevaciones.
+
+Tipografía & espaciado
+
+    Fuente: Inter o Source Sans 3, 14–16px base, 1.5–1.65 de line-height.
+
+    Escala: h1 28–32, h2 22–24, h3 18–20, body 16, caption 13.
+
+    Sistema de espacios 8px (4/8/12/16/24/32/48).
+
+Layout
+
+    Barra superior fija con logo/centro y acciones a la derecha.
+
+    Sidebar colapsable con iconos + labels (pacientes, turnos, órdenes, inventario, reportes, configuración).
+
+    Contenido en cards con padding p-6, bordes rounded-2xl, sombra suave.
+
+    Breadcrumbs claros y título de pantalla + descripción corta.
+
+Componentes clave (estándar y estados)
+
+    Botones: primario sólido, secundario contorno, terciario texto; tamaño md por defecto; estados hover/active/disabled/loading.
+
+    Inputs: label arriba, helper text, validación en tiempo real; radio/checkbox accesibles; select con búsqueda.
+
+    Tables: cabecera sticky, zebra rows, sort, paginación, búsqueda, filas clicables; columnas clave: Paciente, ID, Estado, Prioridad, Última actualización, Acciones.
+
+    Badges de estado clínico:
+
+        Estable (verde), Observación (amarillo), Crítico (rojo), Alta (gris).
+
+    Modales/Sheets para crear/editar; toasts para confirmaciones.
+
+    Tabs en ficha de paciente: Resumen | Signos | Medicación | Órdenes | Laboratorio | Notas.
+
+    Timeline de eventos clínicos con timestamps legibles.
+
+Accesibilidad
+
+    WCAG AA: contraste ≥ 4.5:1, foco visible, navegación por teclado, aria- labels correctos.
+
+    No depender solo del color para estados (añadir iconos/labels).
+
+    Tamaños de toque ≥ 44px.
+
+Microinteracciones
+
+    Hover/focus sutiles (elevación +2, borde activo).
+
+    Skeletons para carga, spinners solo si es breve.
+
+    Animaciones ≤ 150ms (Framer Motion si React).
+
+Data viz (si aplica)
+
+    Gráficas simples (signos vitales) con tooltips y leyendas claras; preferir líneas/sparklines sin ruido visual.
+
+Rendimiento
+
+    CSS purgado de clases no usadas; lazy load de módulos pesados; optimizar imágenes SVG/PNG.
+
+Ejemplos de mejoras específicas
+
+    Dashboard: tarjetas KPI (Pacientes activos, Críticos, Pendientes de alta, Órdenes hoy) con iconos y tendencia.
+
+    Listado de pacientes: buscador global + filtros (área, prioridad, estado, médico a cargo), chips removibles.
+
+    Ficha de paciente: header con datos clave (Nombre, ID, edad, cama, área, estado con badge) y acciones rápidas.
+
+    Formularios clínicos: secciones plegables, validación en vivo, atajos (autocomplete de medicamentos).
+
+Entrega esperada
+
+    Hoja de estilos (Tailwind config o CSS variables) + componentes reutilizables (botones, inputs, tablas, cards, modales).
+
+    Refactor de las vistas principales: Dashboard, Pacientes, Ficha, Órdenes, Reportes.
+
+    Snippets de ejemplo (HTML/JSX) de cada componente y de la Ficha de Paciente.
+
+    Guía breve de uso de tokens y reglas de espaciado/jerarquía.
+
+Tailwind – guía rápida (si usas Tailwind)
+
+    Contenedores: max-w-7xl mx-auto px-6
+
+    Card: rounded-2xl bg-white shadow p-6 border border-gray-200
+
+    Título: text-2xl font-semibold text-slate-900
+
+    Botón primario: inline-flex items-center gap-2 rounded-xl bg-teal-700 px-4 py-2 text-white hover:bg-teal-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-700 disabled:opacity-60
