@@ -4,6 +4,7 @@ const cors = require('cors');
 const { Pool } = require('pg');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
+const path = require('path');
 
 const app = express();
 const port = process.env.PORT || 5001;
@@ -21,6 +22,11 @@ app.use(cors({
 }));
 
 app.use(express.json());
+
+// Serve static files from the React app build directory
+if (process.env.NODE_ENV === 'production') {
+  app.use(express.static(path.join(__dirname, 'build')));
+}
 
 app.use(session({
   store: new pgSession({
@@ -365,6 +371,15 @@ app.post('/api/pacientes/:paciente_id/medicamentos', requireAuth, async (req, re
   } catch (error) {
     console.error('Error assigning medicamento:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Catch-all handler: send back React's index.html file for any non-API routes
+app.get('*', (req, res) => {
+  if (process.env.NODE_ENV === 'production') {
+    res.sendFile(path.join(__dirname, 'build', 'index.html'));
+  } else {
+    res.json({ message: 'API server running. Please access the React app on port 3001.' });
   }
 });
 
