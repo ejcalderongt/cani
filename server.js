@@ -58,9 +58,21 @@ async function initDatabase() {
         "expire" timestamp(6) NOT NULL
       )
       WITH (OIDS=FALSE);
-      
-      ALTER TABLE "session" ADD CONSTRAINT "session_pkey" PRIMARY KEY ("sid") NOT DEFERRABLE INITIALLY IMMEDIATE;
-      CREATE INDEX "IDX_session_expire" ON "session" ("expire");
+    `);
+    
+    // Only add primary key if it doesn't exist
+    await pool.query(`
+      DO $$
+      BEGIN
+        IF NOT EXISTS (SELECT 1 FROM pg_constraint WHERE conname = 'session_pkey') THEN
+          ALTER TABLE "session" ADD CONSTRAINT "session_pkey" PRIMARY KEY ("sid");
+        END IF;
+      END $$;
+    `);
+    
+    // Create index if it doesn't exist
+    await pool.query(`
+      CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
     `);
 
     // Create enfermeros table
