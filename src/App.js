@@ -18,9 +18,8 @@ const getBaseURL = () => {
   if (process.env.NODE_ENV === 'production') {
     return '';
   }
-  // In development, use the current host but port 5001
-  const hostname = window.location.hostname;
-  return `https://${hostname}:5001`;
+  // In development, use HTTP and localhost
+  return 'http://localhost:5001';
 };
 
 axios.defaults.baseURL = getBaseURL();

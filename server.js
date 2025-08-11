@@ -16,7 +16,7 @@ const pool = new Pool({
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : 'http://localhost:3000',
+  origin: process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : ['http://localhost:3000', 'http://localhost:3001'],
   credentials: true
 }));
 
@@ -371,6 +371,6 @@ app.post('/api/pacientes/:paciente_id/medicamentos', requireAuth, async (req, re
 // Start server
 initDatabase().then(() => {
   app.listen(port, '0.0.0.0', () => {
-    console.log(`Server running on port ${port}`);
+    console.log(`Server running on http://0.0.0.0:${port}`);
   });
 });
