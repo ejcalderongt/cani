@@ -14,16 +14,23 @@ function Login({ onLogin }) {
     setLoading(true);
     setError('');
 
+    console.log('Attempting login with:', { codigo });
+
     try {
       const response = await axios.post('/api/login', {
         codigo,
         clave
       });
 
+      console.log('Login response:', response.data);
+
       if (response.data.success) {
         onLogin(response.data.enfermero);
+      } else {
+        setError('Credenciales incorrectas');
       }
     } catch (error) {
+      console.error('Login error:', error);
       setError(error.response?.data?.message || 'Error al iniciar sesión');
     } finally {
       setLoading(false);
