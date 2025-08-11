@@ -6,7 +6,7 @@ const pgSession = require('connect-pg-simple')(session);
 const path = require('path');
 
 const app = express();
-const port = process.env.PORT || 5001;
+const port = process.env.PORT || 5000;
 
 // Database configuration
 const pool = new Pool({
@@ -995,6 +995,15 @@ app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
     console.error('Error resetting database:', error);
     res.status(500).json({ error: 'Error al reinicializar la base de datos' });
   }
+});
+
+// Health check endpoint for deployments
+app.get('/', (req, res) => {
+  res.status(200).json({ 
+    status: 'OK', 
+    message: 'Hospital Management System API is running',
+    timestamp: new Date().toISOString()
+  });
 });
 
 // Catch-all handler: send back React's index.html file for any non-API routes
