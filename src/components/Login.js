@@ -1,13 +1,18 @@
+
 import React, { useState } from 'react';
-import { Container, Card, Form, Button, Alert } from 'react-bootstrap';
 import axios from 'axios';
 
 function Login({ onLogin }) {
-  const [codigo, setCodigo] = useState('');
-  const [clave, setClave] = useState('');
+  const [formData, setFormData] = useState({ codigo: '', clave: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [formData, setFormData] = useState({ codigo: '', clave: '' }); // State to hold form data
+
+  const handleChange = (e) => {
+    setFormData({
+      ...formData,
+      [e.target.name]: e.target.value
+    });
+  };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -17,114 +22,117 @@ function Login({ onLogin }) {
     try {
       console.log('Attempting login with:', { codigo: formData.codigo });
 
-      // Try multiple base URLs for Replit environment
-      const baseURLs = [
-        '', // Current domain
-        `${window.location.protocol}//${window.location.hostname}:3002`,
-        `${window.location.protocol}//${window.location.hostname}:5001`,
-        `${window.location.protocol}//${window.location.hostname}`
-      ];
-
-      let response = null;
-      let lastError = null;
-
-      for (const baseURL of baseURLs) {
-        try {
-          console.log('Trying baseURL:', baseURL);
-          const axiosInstance = axios.create({
-            baseURL: baseURL,
-            withCredentials: true,
-            timeout: 10000
-          });
-
-          response = await axiosInstance.post('/api/login', formData);
-
-          if (response.data.success) {
-            // Update the global axios instance to use this working URL
-            axios.defaults.baseURL = baseURL;
-            onLogin(response.data.enfermero);
-            return;
-          } else {
-            setError(response.data.message || 'Error al iniciar sesión');
-            return;
-          }
-        } catch (err) {
-          lastError = err;
-          console.log('Failed with baseURL:', baseURL, err.message);
-          continue;
+      // Create axios instance with proper configuration for Replit
+      const axiosInstance = axios.create({
+        baseURL: window.location.origin.replace(':3001', ':3002'), // Use port 3002 which maps to 5001
+        withCredentials: true,
+        timeout: 15000,
+        headers: {
+          'Content-Type': 'application/json',
         }
+      });
+
+      const response = await axiosInstance.post('/api/login', formData);
+      
+      if (response.data.success) {
+        onLogin(response.data.enfermero);
+      } else {
+        setError(response.data.message || 'Error de autenticación');
       }
-
-      // If we get here, all attempts failed
-      throw lastError;
-
     } catch (error) {
       console.error('Login error:', error);
-      if (error.code === 'ERR_NETWORK') {
-        setError('Error de conexión. Verifique que el servidor esté ejecutándose.');
+      
+      if (error.code === 'ECONNABORTED') {
+        setError('Tiempo de espera agotado. Verifica tu conexión.');
+      } else if (error.response) {
+        setError(error.response.data?.message || 'Credenciales incorrectas');
+      } else if (error.request) {
+        setError('No se puede conectar al servidor. Intenta más tarde.');
       } else {
-        setError('Error al conectar con el servidor');
+        setError('Error inesperado. Intenta nuevamente.');
       }
     } finally {
       setLoading(false);
     }
   };
 
-  const handleChange = (e) => {
-    const { name, value } = e.target;
-    setFormData(prevState => ({
-      ...prevState,
-      [name]: value
-    }));
-    // Also update local state if you still need it for other purposes
-    if (name === 'codigo') setCodigo(value);
-    if (name === 'clave') setClave(value);
-  };
-
   return (
-    <Container className="d-flex justify-content-center align-items-center vh-100">
-      <Card style={{ width: '400px' }}>
-        <Card.Header>
-          <h4 className="text-center mb-0">Iniciar Sesión</h4>
-        </Card.Header>
-        <Card.Body>
-          {error && <Alert variant="danger">{error}</Alert>}
+    <div className="login-container">
+      <div className="medical-card login-card">
+        <div className="login-header">
+          <h1 className="login-title">Sistema Hospitalario</h1>
+          <p className="login-subtitle">Ingresa tus credenciales para continuar</p>
+        </div>
 
-          <Form onSubmit={handleSubmit}>
-            <Form.Group className="mb-3">
-              <Form.Label>Código</Form.Label>
-              <Form.Control
-                type="text"
-                name="codigo"
-                value={formData.codigo}
-                onChange={handleChange}
-                required
-              />
-            </Form.Group>
+        {error && (
+          <div className="alert alert-danger" role="alert">
+            <strong>Error:</strong> {error}
+          </div>
+        )}
 
-            <Form.Group className="mb-3">
-              <Form.Label>Clave</Form.Label>
-              <Form.Control
-                type="password"
-                name="clave"
-                value={formData.clave}
-                onChange={handleChange}
-                required
-              />
-            </Form.Group>
+        <form onSubmit={handleSubmit}>
+          <div className="form-group">
+            <label htmlFor="codigo" className="form-label">
+              Código de Usuario
+            </label>
+            <input
+              id="codigo"
+              type="text"
+              name="codigo"
+              value={formData.codigo}
+              onChange={handleChange}
+              className="form-control"
+              placeholder="Ingresa tu código"
+              required
+              autoComplete="username"
+              aria-describedby="codigo-help"
+            />
+            <div id="codigo-help" className="form-text">
+              Usa tu código de empleado asignado
+            </div>
+          </div>
 
-            <Button
-              variant="primary"
-              type="submit"
-              className="w-100"
-              disabled={loading}
-            >
-              {loading ? 'Iniciando...' : 'Iniciar Sesión'}
-            </Button>
-          </Form>
-        </Card.Body>
-      </Card>
-    </Container>
+          <div className="form-group">
+            <label htmlFor="clave" className="form-label">
+              Contraseña
+            </label>
+            <input
+              id="clave"
+              type="password"
+              name="clave"
+              value={formData.clave}
+              onChange={handleChange}
+              className="form-control"
+              placeholder="Ingresa tu contraseña"
+              required
+              autoComplete="current-password"
+            />
+          </div>
+
+          <button
+            type="submit"
+            className={`btn btn-primary btn-lg ${loading ? 'loading' : ''}`}
+            disabled={loading || !formData.codigo || !formData.clave}
+            style={{ width: '100%', marginTop: 'var(--space-6)' }}
+          >
+            {loading ? (
+              <>
+                <span className="loading-spinner"></span>
+                Iniciando sesión...
+              </>
+            ) : (
+              'Iniciar Sesión'
+            )}
+          </button>
+        </form>
+
+        <div style={{ marginTop: 'var(--space-6)', padding: 'var(--space-4)', background: 'rgba(15, 118, 110, 0.05)', borderRadius: 'var(--radius)', fontSize: 'var(--text-sm)', color: 'var(--muted)' }}>
+          <strong>Credenciales de prueba:</strong><br />
+          Usuario: <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>admin</code><br />
+          Contraseña: <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>Admin1965!*</code>
+        </div>
+      </div>
+    </div>
   );
 }
 
