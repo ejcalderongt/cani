@@ -20,6 +20,8 @@ function NuevoPaciente() {
     telefono_principal: '',
     telefono_secundario: '',
     tipo_sangre: '',
+    peso: '',
+    estatura: '',
     padecimientos: '',
     informacion_general: '',
     tipo_paciente: 'ambulatorio',
@@ -172,6 +174,35 @@ function NuevoPaciente() {
                     <option value="O+">O+</option>
                     <option value="O-">O-</option>
                   </Form.Select>
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Peso (kg)</Form.Label>
+                  <Form.Control
+                    type="number"
+                    step="0.01"
+                    name="peso"
+                    value={formData.peso}
+                    onChange={handleChange}
+                    placeholder="Ej: 70.5"
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Estatura (m)</Form.Label>
+                  <Form.Control
+                    type="number"
+                    step="0.01"
+                    name="estatura"
+                    value={formData.estatura}
+                    onChange={handleChange}
+                    placeholder="Ej: 1.75"
+                  />
                 </Form.Group>
               </Col>
             </Row>

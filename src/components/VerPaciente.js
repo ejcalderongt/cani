@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Container, Card, Row, Col, Badge, Button } from 'react-bootstrap';
 import { useParams, Link } from 'react-router-dom';
@@ -73,7 +72,9 @@ function VerPaciente() {
                 <Col md={6}>
                   <p><strong>Tipo:</strong> <Badge bg={paciente.tipo_paciente === 'interno' ? 'danger' : 'success'}>{paciente.tipo_paciente}</Badge></p>
                   <p><strong>Tipo de Sangre:</strong> {paciente.tipo_sangre}</p>
-                  <p><strong>Teléfono:</strong> {paciente.telefono_principal}</p>
+                  {paciente.peso && <p><strong>Peso:</strong> {paciente.peso} kg</p>}
+                  {paciente.estatura && <p><strong>Estatura:</strong> {paciente.estatura} m</p>}
+                  <p><strong>Teléfono Principal:</strong> {paciente.telefono_principal}</p>
                   {paciente.cuarto_asignado && <p><strong>Cuarto:</strong> {paciente.cuarto_asignado}</p>}
                   <p><strong>Contacto de Emergencia:</strong> {paciente.contacto_emergencia_nombre} ({paciente.contacto_emergencia_telefono})</p>
                 </Col>

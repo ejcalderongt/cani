@@ -12,6 +12,8 @@ import NotasEnfermeria from './components/NotasEnfermeria';
 import NuevaNota from './components/NuevaNota';
 import Medicamentos from './components/Medicamentos';
 import NuevoMedicamento from './components/NuevoMedicamento';
+import MantenimientoUsuarios from './components/MantenimientoUsuarios';
+import ImprimirNotas from './components/ImprimirNotas';
 
 // Configure axios defaults
 const getBaseURL = () => {
@@ -151,6 +153,20 @@ function App() {
             path="/medicamentos/nuevo"
             element={
               enfermero ? <NuevoMedicamento /> : <Navigate to="/login" />
+            }
+          />
+          
+          <Route
+            path="/imprimir-notas"
+            element={
+              enfermero ? <ImprimirNotas /> : <Navigate to="/login" />
+            }
+          />
+          
+          <Route
+            path="/admin/usuarios"
+            element={
+              enfermero?.codigo === 'admin' ? <MantenimientoUsuarios /> : <Navigate to="/" />
             }
           />
         </Routes>

@@ -135,6 +135,8 @@ async function initDatabase() {
         telefono_principal VARCHAR(20),
         telefono_secundario VARCHAR(20),
         tipo_sangre VARCHAR(5) NOT NULL,
+        peso DECIMAL(5,2),
+        estatura DECIMAL(3,2),
         padecimientos TEXT,
         informacion_general TEXT,
         tipo_paciente VARCHAR(20) NOT NULL,
@@ -143,6 +145,14 @@ async function initDatabase() {
         activo BOOLEAN DEFAULT true
       )
     `);
+
+    // Add peso and estatura columns if they don't exist
+    try {
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS peso DECIMAL(5,2)`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS estatura DECIMAL(3,2)`);
+    } catch (error) {
+      // Columns might already exist
+    }
 
     // Create notas_enfermeria table
     await pool.query(`
@@ -221,6 +231,23 @@ const requireAuth = (req, res, next) => {
   next();
 };
 
+// Admin-only middleware
+const requireAdmin = async (req, res, next) => {
+  if (!req.session.enfermero_id) {
+    return res.status(401).json({ error: 'No autenticado' });
+  }
+  
+  try {
+    const result = await pool.query('SELECT codigo FROM enfermeros WHERE id = $1', [req.session.enfermero_id]);
+    if (result.rows.length === 0 || result.rows[0].codigo !== 'admin') {
+      return res.status(403).json({ error: 'Acceso denegado. Solo administradores.' });
+    }
+    next();
+  } catch (error) {
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
 // Routes
 app.post('/api/login', async (req, res) => {
   try {
@@ -277,23 +304,23 @@ app.post('/api/pacientes', requireAuth, async (req, res) => {
     const {
       numero_expediente, nombre, apellidos, fecha_nacimiento, documento_identidad,
       nacionalidad, contacto_emergencia_nombre, contacto_emergencia_telefono,
-      telefono_principal, telefono_secundario, tipo_sangre, padecimientos,
-      informacion_general, tipo_paciente, cuarto_asignado
+      telefono_principal, telefono_secundario, tipo_sangre, peso, estatura,
+      padecimientos, informacion_general, tipo_paciente, cuarto_asignado
     } = req.body;
 
     const result = await pool.query(`
       INSERT INTO pacientes (
         numero_expediente, nombre, apellidos, fecha_nacimiento, documento_identidad,
         nacionalidad, contacto_emergencia_nombre, contacto_emergencia_telefono,
-        telefono_principal, telefono_secundario, tipo_sangre, padecimientos,
-        informacion_general, tipo_paciente, cuarto_asignado
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
+        telefono_principal, telefono_secundario, tipo_sangre, peso, estatura,
+        padecimientos, informacion_general, tipo_paciente, cuarto_asignado
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
       RETURNING *
     `, [
       numero_expediente, nombre, apellidos, fecha_nacimiento, documento_identidad,
       nacionalidad, contacto_emergencia_nombre, contacto_emergencia_telefono,
-      telefono_principal, telefono_secundario, tipo_sangre, padecimientos,
-      informacion_general, tipo_paciente, cuarto_asignado
+      telefono_principal, telefono_secundario, tipo_sangre, peso, estatura,
+      padecimientos, informacion_general, tipo_paciente, cuarto_asignado
     ]);
 
     res.status(201).json(result.rows[0]);
@@ -414,6 +441,97 @@ app.post('/api/pacientes/:paciente_id/medicamentos', requireAuth, async (req, re
     res.status(201).json(result.rows[0]);
   } catch (error) {
     console.error('Error assigning medicamento:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// User management routes (admin only)
+app.get('/api/admin/usuarios', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, codigo, nombre, apellidos, turno, activo FROM enfermeros ORDER BY nombre');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching usuarios:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.post('/api/admin/usuarios', requireAdmin, async (req, res) => {
+  try {
+    const { codigo, clave, nombre, apellidos, turno } = req.body;
+    
+    const result = await pool.query(`
+      INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING id, codigo, nombre, apellidos, turno, activo
+    `, [codigo, clave, nombre, apellidos, turno]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating usuario:', error);
+    if (error.code === '23505') {
+      res.status(400).json({ error: 'El código de usuario ya existe' });
+    } else {
+      res.status(500).json({ error: 'Error interno del servidor' });
+    }
+  }
+});
+
+app.put('/api/admin/usuarios/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { codigo, clave, nombre, apellidos, turno, activo } = req.body;
+    
+    let query = `
+      UPDATE enfermeros 
+      SET codigo = $1, nombre = $2, apellidos = $3, turno = $4, activo = $5
+    `;
+    let params = [codigo, nombre, apellidos, turno, activo, id];
+    
+    if (clave && clave.trim() !== '') {
+      query = `
+        UPDATE enfermeros 
+        SET codigo = $1, clave = $2, nombre = $3, apellidos = $4, turno = $5, activo = $6
+        WHERE id = $7
+        RETURNING id, codigo, nombre, apellidos, turno, activo
+      `;
+      params = [codigo, clave, nombre, apellidos, turno, activo, id];
+    } else {
+      query += ` WHERE id = $6 RETURNING id, codigo, nombre, apellidos, turno, activo`;
+    }
+
+    const result = await pool.query(query, params);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating usuario:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.delete('/api/admin/usuarios/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    // Don't allow deleting admin user
+    const adminCheck = await pool.query('SELECT codigo FROM enfermeros WHERE id = $1', [id]);
+    if (adminCheck.rows.length > 0 && adminCheck.rows[0].codigo === 'admin') {
+      return res.status(400).json({ error: 'No se puede eliminar el usuario administrador' });
+    }
+    
+    const result = await pool.query('UPDATE enfermeros SET activo = false WHERE id = $1 RETURNING *', [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+
+    res.json({ message: 'Usuario desactivado correctamente' });
+  } catch (error) {
+    console.error('Error deactivating usuario:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
