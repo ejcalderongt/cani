@@ -166,12 +166,7 @@ function Login({ onLogin }) {
           </button>
         </form>
 
-        <div style={{ marginTop: 'var(--space-6)', padding: 'var(--space-4)', background: 'rgba(15, 118, 110, 0.05)', borderRadius: 'var(--radius)', fontSize: 'var(--text-sm)', color: 'var(--muted)' }}>
-          <strong>Credenciales de prueba:</strong><br />
-          <strong>Admin:</strong> <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>admin</code> / <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>Admin1965!*</code><br />
-          <strong>Usuarios:</strong> <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>erick</code>, <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>cintia</code> / <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>abc123</code><br />
-          <small><em>Los usuarios deben cambiar su contraseña en el primer acceso.</em></small>
-        </div>
+        
       </div>
     </div>
   );
