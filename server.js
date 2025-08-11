@@ -536,6 +536,50 @@ app.delete('/api/admin/usuarios/:id', requireAdmin, async (req, res) => {
   }
 });
 
+// Database reset endpoint (admin only)
+app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
+  try {
+    // Start transaction
+    await pool.query('BEGIN');
+    
+    // Delete data in order to respect foreign key constraints
+    await pool.query('DELETE FROM medicamentos_paciente');
+    await pool.query('DELETE FROM notas_enfermeria');
+    await pool.query('DELETE FROM pacientes');
+    await pool.query('DELETE FROM medicamentos');
+    
+    // Reset sequences
+    await pool.query('ALTER SEQUENCE medicamentos_paciente_id_seq RESTART WITH 1');
+    await pool.query('ALTER SEQUENCE notas_enfermeria_id_seq RESTART WITH 1');
+    await pool.query('ALTER SEQUENCE pacientes_id_seq RESTART WITH 1');
+    await pool.query('ALTER SEQUENCE medicamentos_id_seq RESTART WITH 1');
+    
+    // Insert some default medications
+    await pool.query(`
+      INSERT INTO medicamentos (nombre, descripcion, unidad_medida) VALUES
+      ('Paracetamol', 'Analgésico y antipirético', 'mg'),
+      ('Ibuprofeno', 'Antiinflamatorio no esteroideo', 'mg'),
+      ('Amoxicilina', 'Antibiótico de amplio espectro', 'mg'),
+      ('Omeprazol', 'Inhibidor de la bomba de protones', 'mg'),
+      ('Aspirina', 'Ácido acetilsalicílico', 'mg')
+    `);
+    
+    // Commit transaction
+    await pool.query('COMMIT');
+    
+    res.json({ 
+      message: 'Base de datos reinicializada correctamente. Se eliminaron todos los pacientes, notas y medicamentos personalizados. Los usuarios se mantuvieron intactos.' 
+    });
+    
+    console.log('Database reset completed successfully');
+  } catch (error) {
+    // Rollback transaction on error
+    await pool.query('ROLLBACK');
+    console.error('Error resetting database:', error);
+    res.status(500).json({ error: 'Error al reinicializar la base de datos' });
+  }
+});
+
 // Catch-all handler: send back React's index.html file for any non-API routes
 app.get('*', (req, res) => {
   if (process.env.NODE_ENV === 'production') {

@@ -20,13 +20,14 @@ function Navbar({ enfermero, onLogout }) {
             <Nav.Link as={Link} to="/imprimir-notas">Imprimir Notas</Nav.Link>
             {enfermero?.codigo === 'admin' && (
               <NavDropdown title="Administración" id="admin-dropdown">
-                <NavDropdown.Item as={Link} to="/admin/usuarios">
-                  Mantenimiento de Usuarios
-                </NavDropdown.Item>
-                <NavDropdown.Divider />
-                <NavDropdown.Item as={Link} to="/admin/configuracion">
-                  Configuración del Sistema
-                </NavDropdown.Item>
+                <>
+                  <NavDropdown.Item as={Link} to="/admin/usuarios">
+                    Mantenimiento de Usuarios
+                  </NavDropdown.Item>
+                  <NavDropdown.Item as={Link} to="/admin/sistema">
+                    Configuración de Sistema
+                  </NavDropdown.Item>
+                </>
               </NavDropdown>
             )}
           </Nav>

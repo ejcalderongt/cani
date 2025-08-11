@@ -13,6 +13,7 @@ import NuevaNota from './components/NuevaNota';
 import Medicamentos from './components/Medicamentos';
 import NuevoMedicamento from './components/NuevoMedicamento';
 import MantenimientoUsuarios from './components/MantenimientoUsuarios';
+import ConfiguracionSistema from './components/ConfiguracionSistema';
 import ImprimirNotas from './components/ImprimirNotas';
 
 // Configure axios defaults
@@ -167,6 +168,13 @@ function App() {
             path="/admin/usuarios"
             element={
               enfermero?.codigo === 'admin' ? <MantenimientoUsuarios /> : <Navigate to="/" />
+            }
+          />
+          
+          <Route
+            path="/admin/sistema"
+            element={
+              enfermero?.codigo === 'admin' ? <ConfiguracionSistema /> : <Navigate to="/" />
             }
           />
         </Routes>
