@@ -1,0 +1,38 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <h1>Notas de Enfermería</h1>
+    <a href="{{ url_for('nueva_nota') }}" class="btn btn-success">Nueva Nota</a>
+</div>
+
+<div class="table-responsive">
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>Fecha</th>
+                <th>Hora</th>
+                <th>Paciente</th>
+                <th>Enfermero</th>
+                <th>Observaciones</th>
+            </tr>
+        </thead>
+        <tbody>
+            {% for nota in notas %}
+            <tr>
+                <td>{{ nota.fecha.strftime('%d/%m/%Y') }}</td>
+                <td>{{ nota.hora.strftime('%H:%M') }}</td>
+                <td>{{ nota.paciente.nombre }} {{ nota.paciente.apellidos }}</td>
+                <td>{{ nota.enfermero.nombre }} {{ nota.enfermero.apellidos }}</td>
+                <td>{{ nota.observaciones[:100] }}{% if nota.observaciones|length > 100 %}...{% endif %}</td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" class="text-center">No hay notas registradas</td>
+            </tr>
+            {% endfor %}
+        </tbody>
+    </table>
+</div>
+{% endblock %}

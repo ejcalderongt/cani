@@ -1,0 +1,116 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Nuevo Paciente</h1>
+
+<form method="POST" class="row g-3">
+    <div class="col-md-6">
+        <label for="numero_expediente" class="form-label">Número de Expediente *</label>
+        <input type="text" class="form-control" id="numero_expediente" name="numero_expediente" required>
+    </div>
+    
+    <div class="col-md-6">
+        <label for="tipo_paciente" class="form-label">Tipo de Paciente *</label>
+        <select class="form-select" id="tipo_paciente" name="tipo_paciente" required onchange="toggleCuarto()">
+            <option value="">Seleccionar...</option>
+            <option value="interno">Interno</option>
+            <option value="ambulatorio">Ambulatorio</option>
+        </select>
+    </div>
+    
+    <div class="col-md-6">
+        <label for="nombre" class="form-label">Nombre *</label>
+        <input type="text" class="form-control" id="nombre" name="nombre" required>
+    </div>
+    
+    <div class="col-md-6">
+        <label for="apellidos" class="form-label">Apellidos *</label>
+        <input type="text" class="form-control" id="apellidos" name="apellidos" required>
+    </div>
+    
+    <div class="col-md-6">
+        <label for="fecha_nacimiento" class="form-label">Fecha de Nacimiento *</label>
+        <input type="date" class="form-control" id="fecha_nacimiento" name="fecha_nacimiento" required>
+    </div>
+    
+    <div class="col-md-6">
+        <label for="documento_identidad" class="form-label">Documento de Identidad *</label>
+        <input type="text" class="form-control" id="documento_identidad" name="documento_identidad" required>
+    </div>
+    
+    <div class="col-md-6">
+        <label for="nacionalidad" class="form-label">Nacionalidad *</label>
+        <input type="text" class="form-control" id="nacionalidad" name="nacionalidad" required>
+    </div>
+    
+    <div class="col-md-6">
+        <label for="tipo_sangre" class="form-label">Tipo de Sangre *</label>
+        <select class="form-select" id="tipo_sangre" name="tipo_sangre" required>
+            <option value="">Seleccionar...</option>
+            <option value="O-">O-</option>
+            <option value="O+">O+</option>
+            <option value="A-">A-</option>
+            <option value="A+">A+</option>
+            <option value="B-">B-</option>
+            <option value="B+">B+</option>
+            <option value="AB-">AB-</option>
+            <option value="AB+">AB+</option>
+        </select>
+    </div>
+    
+    <div class="col-md-6" id="cuarto_div" style="display: none;">
+        <label for="cuarto_asignado" class="form-label">Cuarto Asignado</label>
+        <input type="text" class="form-control" id="cuarto_asignado" name="cuarto_asignado">
+    </div>
+    
+    <div class="col-md-6">
+        <label for="telefono_principal" class="form-label">Teléfono Principal</label>
+        <input type="tel" class="form-control" id="telefono_principal" name="telefono_principal">
+    </div>
+    
+    <div class="col-md-6">
+        <label for="telefono_secundario" class="form-label">Teléfono Secundario</label>
+        <input type="tel" class="form-control" id="telefono_secundario" name="telefono_secundario">
+    </div>
+    
+    <div class="col-md-6">
+        <label for="contacto_emergencia_nombre" class="form-label">Contacto de Emergencia (Nombre)</label>
+        <input type="text" class="form-control" id="contacto_emergencia_nombre" name="contacto_emergencia_nombre">
+    </div>
+    
+    <div class="col-md-6">
+        <label for="contacto_emergencia_telefono" class="form-label">Contacto de Emergencia (Teléfono)</label>
+        <input type="tel" class="form-control" id="contacto_emergencia_telefono" name="contacto_emergencia_telefono">
+    </div>
+    
+    <div class="col-12">
+        <label for="padecimientos" class="form-label">Padecimientos</label>
+        <textarea class="form-control" id="padecimientos" name="padecimientos" rows="3"></textarea>
+    </div>
+    
+    <div class="col-12">
+        <label for="informacion_general" class="form-label">Información General</label>
+        <textarea class="form-control" id="informacion_general" name="informacion_general" rows="3"></textarea>
+    </div>
+    
+    <div class="col-12">
+        <button type="submit" class="btn btn-success">Guardar Paciente</button>
+        <a href="{{ url_for('pacientes') }}" class="btn btn-secondary">Cancelar</a>
+    </div>
+</form>
+
+<script>
+function toggleCuarto() {
+    const tipoPaciente = document.getElementById('tipo_paciente').value;
+    const cuartoDiv = document.getElementById('cuarto_div');
+    
+    if (tipoPaciente === 'interno') {
+        cuartoDiv.style.display = 'block';
+    } else {
+        cuartoDiv.style.display = 'none';
+        document.getElementById('cuarto_asignado').value = '';
+    }
+}
+</script>
+{% endblock %}

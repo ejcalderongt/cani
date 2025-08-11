@@ -1,0 +1,45 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-12">
+        <h1>Panel de Control</h1>
+    </div>
+</div>
+
+<div class="row mt-4">
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Pacientes</h5>
+                <p class="card-text">Gestionar el catálogo de pacientes internos y ambulatorios</p>
+                <a href="{{ url_for('pacientes') }}" class="btn btn-primary">Ver Pacientes</a>
+                <a href="{{ url_for('nuevo_paciente') }}" class="btn btn-success">Nuevo Paciente</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Notas de Enfermería</h5>
+                <p class="card-text">Registrar y consultar notas diarias de enfermería</p>
+                <a href="{{ url_for('notas_enfermeria') }}" class="btn btn-primary">Ver Notas</a>
+                <a href="{{ url_for('nueva_nota') }}" class="btn btn-success">Nueva Nota</a>
+            </div>
+        </div>
+    </div>
+    
+    <div class="col-md-4">
+        <div class="card">
+            <div class="card-body">
+                <h5 class="card-title">Medicamentos</h5>
+                <p class="card-text">Gestionar catálogo de medicamentos y tratamientos</p>
+                <a href="{{ url_for('medicamentos') }}" class="btn btn-primary">Ver Medicamentos</a>
+                <a href="{{ url_for('nuevo_medicamento') }}" class="btn btn-success">Nuevo Medicamento</a>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}

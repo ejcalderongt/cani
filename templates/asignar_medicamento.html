@@ -1,0 +1,60 @@
+
+{% extends "base.html" %}
+
+{% block content %}
+<h1>Asignar Medicamento a {{ paciente.nombre }} {{ paciente.apellidos }}</h1>
+
+<form method="POST" class="row g-3">
+    <div class="col-12">
+        <label for="medicamento_id" class="form-label">Medicamento *</label>
+        <select class="form-select" id="medicamento_id" name="medicamento_id" required>
+            <option value="">Seleccionar medicamento...</option>
+            {% for medicamento in medicamentos %}
+            <option value="{{ medicamento.id }}">{{ medicamento.nombre }} ({{ medicamento.unidad_medida }})</option>
+            {% endfor %}
+        </select>
+    </div>
+    
+    <div class="col-md-6">
+        <label for="dosis" class="form-label">Dosis *</label>
+        <input type="text" class="form-control" id="dosis" name="dosis" placeholder="Ej: 500mg, 2 tabletas" required>
+    </div>
+    
+    <div class="col-md-6">
+        <label for="frecuencia" class="form-label">Frecuencia *</label>
+        <input type="text" class="form-control" id="frecuencia" name="frecuencia" placeholder="Ej: cada 8 horas, 3 veces al día" required>
+    </div>
+    
+    <div class="col-12">
+        <label for="horarios" class="form-label">Horarios de Administración</label>
+        <input type="text" class="form-control" id="horarios" name="horarios" placeholder="Ej: 08:00, 16:00, 00:00">
+    </div>
+    
+    <div class="col-md-6">
+        <label for="fecha_inicio" class="form-label">Fecha de Inicio *</label>
+        <input type="date" class="form-control" id="fecha_inicio" name="fecha_inicio" required>
+    </div>
+    
+    <div class="col-md-6">
+        <label for="fecha_fin" class="form-label">Fecha de Fin</label>
+        <input type="date" class="form-control" id="fecha_fin" name="fecha_fin">
+    </div>
+    
+    <div class="col-12">
+        <label for="indicaciones" class="form-label">Indicaciones Especiales</label>
+        <textarea class="form-control" id="indicaciones" name="indicaciones" rows="3"></textarea>
+    </div>
+    
+    <div class="col-12">
+        <button type="submit" class="btn btn-success">Asignar Medicamento</button>
+        <a href="{{ url_for('ver_paciente', id=paciente.id) }}" class="btn btn-secondary">Cancelar</a>
+    </div>
+</form>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const today = new Date().toISOString().split('T')[0];
+    document.getElementById('fecha_inicio').value = today;
+});
+</script>
+{% endblock %}
