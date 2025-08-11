@@ -15,6 +15,7 @@ import NuevoMedicamento from './components/NuevoMedicamento';
 import MantenimientoUsuarios from './components/MantenimientoUsuarios';
 import ConfiguracionSistema from './components/ConfiguracionSistema';
 import ImprimirNotas from './components/ImprimirNotas';
+import CambiarClave from './components/CambiarClave';
 
 // Configure axios defaults
 const getBaseURL = () => {
@@ -182,6 +183,13 @@ function App() {
             path="/admin/sistema"
             element={
               enfermero?.codigo === 'admin' ? <ConfiguracionSistema /> : <Navigate to="/" />
+            }
+          />
+
+          <Route
+            path="/cambiar-clave"
+            element={
+              enfermero ? <CambiarClave /> : <Navigate to="/login" />
             }
           />
         </Routes>

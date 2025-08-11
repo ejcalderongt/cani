@@ -1,15 +1,14 @@
-
 import React, { useState } from 'react';
 import axios from 'axios';
-import CambiarPassword from './CambiarPassword';
+import CambiarClave from './CambiarClave';
 
 function Login({ onLogin }) {
   const [formData, setFormData] = useState({ codigo: '', clave: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
-  const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
-  const [tempEnfermero, setTempEnfermero] = useState(null);
-  const [successMessage, setSuccessMessage] = useState('');
+  const [showPasswordChange, setShowPasswordChange] = useState(false);
+  const [userForPasswordChange, setUserForPasswordChange] = useState(null);
+  const [success, setSuccess] = useState('');
 
   const handleChange = (e) => {
     setFormData({
@@ -37,13 +36,14 @@ function Login({ onLogin }) {
       });
 
       const response = await axiosInstance.post('/api/login', formData);
-      
+
       if (response.data.success) {
-        if (response.data.requiresPasswordChange) {
-          setRequiresPasswordChange(true);
-          setTempEnfermero(response.data.enfermero);
-          setError('');
+        if (response.data.requiere_cambio_clave) {
+          // User needs to change password
+          setUserForPasswordChange(response.data.enfermero);
+          setShowPasswordChange(true);
         } else {
+          // Normal login flow
           onLogin(response.data.enfermero);
         }
       } else {
@@ -51,7 +51,7 @@ function Login({ onLogin }) {
       }
     } catch (error) {
       console.error('Login error:', error);
-      
+
       if (error.code === 'ECONNABORTED') {
         setError('Tiempo de espera agotado. Verifica tu conexión.');
       } else if (error.response) {
@@ -67,23 +67,23 @@ function Login({ onLogin }) {
   };
 
   const handlePasswordChanged = () => {
-    setRequiresPasswordChange(false);
-    setTempEnfermero(null);
+    setShowPasswordChange(false);
+    setUserForPasswordChange(null);
     setFormData({ codigo: '', clave: '' });
-    setSuccessMessage('Contraseña cambiada correctamente. Por favor inicia sesión nuevamente.');
-    setTimeout(() => setSuccessMessage(''), 5000);
+    setSuccess('Contraseña cambiada correctamente. Por favor inicia sesión nuevamente.');
+    setTimeout(() => setSuccess(''), 5000);
   };
 
   const handlePasswordChangeCancel = () => {
-    setRequiresPasswordChange(false);
-    setTempEnfermero(null);
+    setShowPasswordChange(false);
+    setUserForPasswordChange(null);
     setFormData({ codigo: '', clave: '' });
   };
 
-  if (requiresPasswordChange && tempEnfermero) {
+  if (showPasswordChange && userForPasswordChange) {
     return (
-      <CambiarPassword 
-        enfermero={tempEnfermero}
+      <CambiarClave 
+        enfermero={userForPasswordChange}
         onPasswordChanged={handlePasswordChanged}
         onCancel={handlePasswordChangeCancel}
       />
@@ -104,9 +104,9 @@ function Login({ onLogin }) {
           </div>
         )}
 
-        {successMessage && (
+        {success && (
           <div className="alert alert-success" role="alert">
-            <strong>Éxito:</strong> {successMessage}
+            <strong>Éxito:</strong> {success}
           </div>
         )}
 
@@ -168,18 +168,9 @@ function Login({ onLogin }) {
 
         <div style={{ marginTop: 'var(--space-6)', padding: 'var(--space-4)', background: 'rgba(15, 118, 110, 0.05)', borderRadius: 'var(--radius)', fontSize: 'var(--text-sm)', color: 'var(--muted)' }}>
           <strong>Credenciales de prueba:</strong><br />
-          <div style={{ marginBottom: 'var(--space-2)' }}>
-            <strong>Admin:</strong> <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>admin</code> / 
-            <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px', marginLeft: '4px' }}>Admin1965!*</code>
-          </div>
-          <div>
-            <strong>Usuarios:</strong> <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>erick</code>, 
-            <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px', marginLeft: '4px' }}>cintia</code>, 
-            <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px', marginLeft: '4px' }}>ENF001</code> / 
-            <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px', marginLeft: '4px' }}>abc123</code>
-            <br />
-            <em style={{ fontSize: '0.8em', opacity: 0.8 }}>Estos usuarios deben cambiar su contraseña al iniciar sesión</em>
-          </div>
+          <strong>Admin:</strong> <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>admin</code> / <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>Admin1965!*</code><br />
+          <strong>Usuarios:</strong> <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>erick</code>, <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>cintia</code> / <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>abc123</code><br />
+          <small><em>Los usuarios deben cambiar su contraseña en el primer acceso.</em></small>
         </div>
       </div>
     </div>

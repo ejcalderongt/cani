@@ -1,4 +1,3 @@
-
 const express = require('express');
 const cors = require('cors');
 const { Pool } = require('pg');
@@ -20,7 +19,7 @@ app.use(cors({
   origin: function (origin, callback) {
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
+
     // Allow all Replit domains and localhost for development
     const allowedOrigins = [
       'http://localhost:3000',
@@ -30,7 +29,7 @@ app.use(cors({
       /https:\/\/.*\.repl\.co$/,
       /https:\/\/.*\.repl\.co:\d+$/
     ];
-    
+
     // Check if origin matches any allowed pattern
     const isAllowed = allowedOrigins.some(pattern => {
       if (typeof pattern === 'string') {
@@ -39,7 +38,7 @@ app.use(cors({
         return pattern.test(origin);
       }
     });
-    
+
     if (isAllowed) {
       callback(null, true);
     } else {
@@ -80,7 +79,7 @@ async function initDatabase() {
     console.log('No DATABASE_URL found. Please set up a PostgreSQL database in the Database tab.');
     return;
   }
-  
+
   try {
     // Create session table
     await pool.query(`
@@ -91,7 +90,7 @@ async function initDatabase() {
       )
       WITH (OIDS=FALSE);
     `);
-    
+
     // Only add primary key if it doesn't exist
     await pool.query(`
       DO $$
@@ -101,7 +100,7 @@ async function initDatabase() {
         END IF;
       END $$;
     `);
-    
+
     // Create index if it doesn't exist
     await pool.query(`
       CREATE INDEX IF NOT EXISTS "IDX_session_expire" ON "session" ("expire");
@@ -239,7 +238,7 @@ async function initDatabase() {
     try {
       // Add debe_cambiar_password column to enfermeros
       await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS debe_cambiar_password BOOLEAN DEFAULT false`);
-      
+
       // Add patient columns
       await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS sexo VARCHAR(20)`);
       await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fecha_ingreso TIMESTAMP`);
@@ -288,36 +287,41 @@ async function initDatabase() {
       )
     `);
 
-    // Insert/Update default users
-    const existingUsers = await pool.query('SELECT codigo, clave FROM enfermeros WHERE codigo IN ($1, $2, $3, $4)', ['admin', 'erick', 'cintia', 'ENF001']);
+    // Add columns for password change requirement if they don't exist
+    try {
+      await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS debe_cambiar_clave BOOLEAN DEFAULT false`);
+      await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS primer_login BOOLEAN DEFAULT true`);
+    } catch (error) {
+      // Columns might already exist
+    }
+
+    // Insert default users if they don't exist
+    const existingUsers = await pool.query('SELECT codigo FROM enfermeros WHERE codigo IN ($1, $2, $3, $4)', ['admin', 'erick', 'cintia', 'ENF001']);
     const existingCodes = existingUsers.rows.map(row => row.codigo);
-    
+
     const defaultUsers = [
-      { codigo: 'admin', clave: 'Admin1965!*', nombre: 'Admin', apellidos: 'Sistema', turno: 'todos', debe_cambiar_password: false },
-      { codigo: 'erick', clave: 'abc123', nombre: 'Erick', apellidos: 'Usuario', turno: 'mañana', debe_cambiar_password: true },
-      { codigo: 'cintia', clave: 'abc123', nombre: 'Cintia', apellidos: 'Usuario', turno: 'tarde', debe_cambiar_password: true },
-      { codigo: 'ENF001', clave: 'abc123', nombre: 'Enfermero', apellidos: 'De Prueba', turno: 'mañana', debe_cambiar_password: true }
+      {codigo: 'admin', clave: 'Admin1965!*', nombre: 'Admin', apellidos: 'Sistema', turno: 'todos', debe_cambiar_clave: false, primer_login: false },
+      {codigo: 'erick', clave: 'abc123', nombre: 'Erick', apellidos: 'Usuario', turno: 'mañana', debe_cambiar_clave: true, primer_login: true },
+      {codigo: 'cintia', clave: 'abc123', nombre: 'Cintia', apellidos: 'Usuario', turno: 'tarde', debe_cambiar_clave: true, primer_login: true },
+      {codigo: 'ENF001', clave: 'abc123', nombre: 'Enfermero', apellidos: 'De Prueba', turno: 'mañana', debe_cambiar_clave: true, primer_login: true }
     ];
 
     for (const user of defaultUsers) {
       if (!existingCodes.includes(user.codigo)) {
         await pool.query(`
-          INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno, debe_cambiar_password)
-          VALUES ($1, $2, $3, $4, $5, $6)
-        `, [user.codigo, user.clave, user.nombre, user.apellidos, user.turno, user.debe_cambiar_password]);
+          INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno, debe_cambiar_clave, primer_login)
+          VALUES ($1, $2, $3, $4, $5, $6, $7)
+        `, [user.codigo, user.clave, user.nombre, user.apellidos, user.turno, user.debe_cambiar_clave, user.primer_login]);
         console.log(`Created user: ${user.codigo}`);
-      } else {
-        // Update existing non-admin users with new password requirements
-        if (user.codigo !== 'admin') {
-          await pool.query(`
-            UPDATE enfermeros 
-            SET clave = $1, debe_cambiar_password = $2 
-            WHERE codigo = $3
-          `, [user.clave, user.debe_cambiar_password, user.codigo]);
-          console.log(`Updated password for user: ${user.codigo}`);
-        }
       }
     }
+
+    // Update existing non-admin users to have default password and require change
+    await pool.query(`
+      UPDATE enfermeros 
+      SET clave = 'abc123', debe_cambiar_clave = true, primer_login = true 
+      WHERE codigo != 'admin' AND clave != 'abc123'
+    `);
 
     console.log('Database initialized successfully');
   } catch (error) {
@@ -338,7 +342,7 @@ const requireAdmin = async (req, res, next) => {
   if (!req.session.enfermero_id) {
     return res.status(401).json({ error: 'No autenticado' });
   }
-  
+
   try {
     const result = await pool.query('SELECT codigo FROM enfermeros WHERE id = $1', [req.session.enfermero_id]);
     if (result.rows.length === 0 || result.rows[0].codigo !== 'admin') {
@@ -354,31 +358,29 @@ const requireAdmin = async (req, res, next) => {
 app.post('/api/login', async (req, res) => {
   try {
     const { codigo, clave } = req.body;
-    
+
     const result = await pool.query(
       'SELECT * FROM enfermeros WHERE codigo = $1 AND clave = $2 AND activo = true',
       [codigo, clave]
     );
-    
+
     if (result.rows.length > 0) {
       const enfermero = result.rows[0];
-      
-      // Check if user needs to change password
-      if (enfermero.debe_cambiar_password) {
+
+      // Check if user needs to change password (except admin)
+      if (enfermero.codigo !== 'admin' && (enfermero.debe_cambiar_clave || enfermero.primer_login)) {
         return res.json({
           success: true,
-          requiresPasswordChange: true,
+          requiere_cambio_clave: true,
           enfermero: {
             id: enfermero.id,
             codigo: enfermero.codigo,
             nombre: enfermero.nombre,
-            apellidos: enfermero.apellidos,
-            turno: enfermero.turno,
-            activo: enfermero.activo
+            apellidos: enfermero.apellidos
           }
         });
       }
-      
+
       req.session.enfermero_id = enfermero.id;
       res.json({
         success: true,
@@ -411,33 +413,33 @@ app.post('/api/logout', (req, res) => {
 app.post('/api/change-password', async (req, res) => {
   try {
     const { codigo, claveActual, nuevaClave } = req.body;
-    
+
     // Verify current password
     const result = await pool.query(
       'SELECT * FROM enfermeros WHERE codigo = $1 AND clave = $2 AND activo = true',
       [codigo, claveActual]
     );
-    
+
     if (result.rows.length === 0) {
       return res.status(401).json({
         success: false,
         message: 'Contraseña actual incorrecta'
       });
     }
-    
+
     const enfermero = result.rows[0];
-    
+
     // Update password and remove password change requirement
     await pool.query(
-      'UPDATE enfermeros SET clave = $1, debe_cambiar_password = false WHERE id = $2',
+      'UPDATE enfermeros SET clave = $1, debe_cambiar_clave = false, primer_login = false WHERE id = $2',
       [nuevaClave, enfermero.id]
     );
-    
+
     res.json({
       success: true,
       message: 'Contraseña cambiada correctamente. Por favor inicia sesión nuevamente.'
     });
-    
+
   } catch (error) {
     console.error('Error changing password:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
@@ -488,7 +490,7 @@ app.post('/api/pacientes', requireAuth, async (req, res) => {
 app.get('/api/pacientes/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const pacienteResult = await pool.query('SELECT * FROM pacientes WHERE id = $1', [id]);
     if (pacienteResult.rows.length === 0) {
       return res.status(404).json({ error: 'Paciente no encontrado' });
@@ -541,7 +543,7 @@ app.get('/api/notas', requireAuth, async (req, res) => {
 app.post('/api/notas', requireAuth, async (req, res) => {
   try {
     const { fecha, hora, paciente_id, observaciones, medicamentos_administrados, tratamientos } = req.body;
-    
+
     const result = await pool.query(`
       INSERT INTO notas_enfermeria (fecha, hora, paciente_id, enfermero_id, observaciones, medicamentos_administrados, tratamientos)
       VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -568,7 +570,7 @@ app.get('/api/medicamentos', requireAuth, async (req, res) => {
 app.post('/api/medicamentos', requireAuth, async (req, res) => {
   try {
     const { nombre, descripcion, unidad_medida } = req.body;
-    
+
     const result = await pool.query(`
       INSERT INTO medicamentos (nombre, descripcion, unidad_medida)
       VALUES ($1, $2, $3)
@@ -586,7 +588,7 @@ app.post('/api/pacientes/:paciente_id/medicamentos', requireAuth, async (req, re
   try {
     const { paciente_id } = req.params;
     const { medicamento_id, dosis, frecuencia, horarios, indicaciones, fecha_inicio, fecha_fin } = req.body;
-    
+
     const result = await pool.query(`
       INSERT INTO medicamentos_paciente (paciente_id, medicamento_id, dosis, frecuencia, horarios, indicaciones, fecha_inicio, fecha_fin)
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
@@ -614,7 +616,7 @@ app.get('/api/admin/usuarios', requireAdmin, async (req, res) => {
 app.post('/api/admin/usuarios', requireAdmin, async (req, res) => {
   try {
     const { codigo, clave, nombre, apellidos, turno } = req.body;
-    
+
     const result = await pool.query(`
       INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno)
       VALUES ($1, $2, $3, $4, $5)
@@ -636,19 +638,18 @@ app.put('/api/admin/usuarios/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
     const { codigo, clave, nombre, apellidos, turno, activo } = req.body;
-    
+
     let query = `
       UPDATE enfermeros 
       SET codigo = $1, nombre = $2, apellidos = $3, turno = $4, activo = $5
     `;
     let params = [codigo, nombre, apellidos, turno, activo, id];
-    
+
     if (clave && clave.trim() !== '') {
       query = `
         UPDATE enfermeros 
         SET codigo = $1, clave = $2, nombre = $3, apellidos = $4, turno = $5, activo = $6
-        WHERE id = $7
-        RETURNING id, codigo, nombre, apellidos, turno, activo
+        WHERE id = $7 RETURNING id, codigo, nombre, apellidos, turno, activo
       `;
       params = [codigo, clave, nombre, apellidos, turno, activo, id];
     } else {
@@ -656,7 +657,7 @@ app.put('/api/admin/usuarios/:id', requireAdmin, async (req, res) => {
     }
 
     const result = await pool.query(query, params);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
@@ -671,15 +672,15 @@ app.put('/api/admin/usuarios/:id', requireAdmin, async (req, res) => {
 app.delete('/api/admin/usuarios/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     // Don't allow deleting admin user
     const adminCheck = await pool.query('SELECT codigo FROM enfermeros WHERE id = $1', [id]);
     if (adminCheck.rows.length > 0 && adminCheck.rows[0].codigo === 'admin') {
       return res.status(400).json({ error: 'No se puede eliminar el usuario administrador' });
     }
-    
+
     const result = await pool.query('UPDATE enfermeros SET activo = false WHERE id = $1 RETURNING *', [id]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
@@ -707,7 +708,7 @@ app.post('/api/pacientes/:id/fotos-pertenencias', requireAuth, async (req, res) 
   try {
     const { id } = req.params;
     const { nombre_archivo, descripcion, datos_imagen } = req.body;
-    
+
     const result = await pool.query(`
       INSERT INTO fotos_pertenencias (paciente_id, nombre_archivo, descripcion, datos_imagen)
       VALUES ($1, $2, $3, $4)
@@ -736,7 +737,7 @@ app.post('/api/pacientes/:id/fotos-medicamentos', requireAuth, async (req, res) 
   try {
     const { id } = req.params;
     const { nombre_archivo, descripcion, datos_imagen } = req.body;
-    
+
     const result = await pool.query(`
       INSERT INTO fotos_medicamentos (paciente_id, nombre_archivo, descripcion, datos_imagen)
       VALUES ($1, $2, $3, $4)
@@ -766,7 +767,7 @@ app.post('/api/pacientes/:id/citas', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { nombre_doctor, fecha_cita, hora_cita, anotaciones } = req.body;
-    
+
     const result = await pool.query(`
       INSERT INTO citas_seguimiento (paciente_id, nombre_doctor, fecha_cita, hora_cita, anotaciones)
       VALUES ($1, $2, $3, $4, $5)
@@ -784,7 +785,7 @@ app.put('/api/citas/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
     const { nombre_doctor, fecha_cita, hora_cita, anotaciones, estado } = req.body;
-    
+
     const result = await pool.query(`
       UPDATE citas_seguimiento 
       SET nombre_doctor = $1, fecha_cita = $2, hora_cita = $3, anotaciones = $4, estado = $5
@@ -806,9 +807,9 @@ app.put('/api/citas/:id', requireAuth, async (req, res) => {
 app.delete('/api/citas/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
-    
+
     const result = await pool.query('DELETE FROM citas_seguimiento WHERE id = $1 RETURNING *', [id]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Cita no encontrada' });
     }
@@ -845,7 +846,7 @@ app.post('/api/signos-vitales', requireAuth, async (req, res) => {
       paciente_id, presion_sistolica, presion_diastolica, 
       saturacion_oxigeno, frecuencia_cardiaca, temperatura, observaciones 
     } = req.body;
-    
+
     const result = await pool.query(`
       INSERT INTO signos_vitales (
         paciente_id, enfermero_id, presion_sistolica, presion_diastolica,
@@ -906,7 +907,7 @@ app.post('/api/pruebas-doping', requireAuth, async (req, res) => {
       paciente_id, fecha_prueba, hora_prueba, tipo_muestra, 
       resultado, sustancias_detectadas, observaciones 
     } = req.body;
-    
+
     const result = await pool.query(`
       INSERT INTO pruebas_doping (
         paciente_id, enfermero_id, fecha_prueba, hora_prueba, tipo_muestra,
@@ -947,7 +948,7 @@ app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
   try {
     // Start transaction
     await pool.query('BEGIN');
-    
+
     // Delete data in order to respect foreign key constraints
     await pool.query('DELETE FROM citas_seguimiento');
     await pool.query('DELETE FROM pruebas_doping');
@@ -958,7 +959,7 @@ app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
     await pool.query('DELETE FROM notas_enfermeria');
     await pool.query('DELETE FROM pacientes');
     await pool.query('DELETE FROM medicamentos');
-    
+
     // Reset sequences
     await pool.query('ALTER SEQUENCE citas_seguimiento_id_seq RESTART WITH 1');
     await pool.query('ALTER SEQUENCE pruebas_doping_id_seq RESTART WITH 1');
@@ -969,7 +970,7 @@ app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
     await pool.query('ALTER SEQUENCE notas_enfermeria_id_seq RESTART WITH 1');
     await pool.query('ALTER SEQUENCE pacientes_id_seq RESTART WITH 1');
     await pool.query('ALTER SEQUENCE medicamentos_id_seq RESTART WITH 1');
-    
+
     // Insert some default medications
     await pool.query(`
       INSERT INTO medicamentos (nombre, descripcion, unidad_medida) VALUES
@@ -979,14 +980,14 @@ app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
       ('Omeprazol', 'Inhibidor de la bomba de protones', 'mg'),
       ('Aspirina', 'Ácido acetilsalicílico', 'mg')
     `);
-    
+
     // Commit transaction
     await pool.query('COMMIT');
-    
+
     res.json({ 
       message: 'Base de datos reinicializada correctamente. Se eliminaron todos los pacientes, notas y medicamentos personalizados. Los usuarios se mantuvieron intactos.' 
     });
-    
+
     console.log('Database reset completed successfully');
   } catch (error) {
     // Rollback transaction on error
