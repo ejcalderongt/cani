@@ -6,7 +6,7 @@ const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 
 const app = express();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || 5001;
 
 // Database configuration
 const pool = new Pool({
@@ -38,6 +38,11 @@ app.use(session({
 
 // Initialize database tables
 async function initDatabase() {
+  if (!process.env.DATABASE_URL) {
+    console.log('No DATABASE_URL found. Please set up a PostgreSQL database in the Database tab.');
+    return;
+  }
+  
   try {
     // Create session table
     await pool.query(`

@@ -3,7 +3,7 @@ modules = ["nodejs-20"]
 channel = "stable-25_05"
 
 [workflows]
-runButton = "Run Hospital App"
+runButton = "Hospital App"
 
 [[workflows.workflow]]
 name = "Run Hospital App"
@@ -22,6 +22,15 @@ mode = "sequential"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "node server.js"
+
+[[workflows.workflow]]
+name = "Hospital App"
+author = 44594929
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "PORT=5001 concurrently \"npm run server\" \"BROWSER=none npm start\""
 
 [[ports]]
 localPort = 3000

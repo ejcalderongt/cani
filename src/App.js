@@ -14,7 +14,7 @@ import Medicamentos from './components/Medicamentos';
 import NuevoMedicamento from './components/NuevoMedicamento';
 
 // Configure axios defaults
-axios.defaults.baseURL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5000';
+axios.defaults.baseURL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
 axios.defaults.withCredentials = true;
 
 function App() {
