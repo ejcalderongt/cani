@@ -19,27 +19,54 @@ import CambiarClave from './components/CambiarClave';
 
 // Configure axios defaults
 const getBaseURL = () => {
-  if (process.env.NODE_ENV === 'production') {
+  // In Replit environment, the backend runs on the same domain
+  if (window.location.hostname.includes('replit.dev')) {
     return '';
   }
 
-  // In Replit environment, try different port configurations
-  if (window.location.hostname.includes('replit.dev')) {
-    // For Replit, we need to figure out the correct port mapping
-    // Let's try the same domain but different ports
-    const hostname = window.location.hostname;
-    const protocol = window.location.protocol;
-
-    // First try port 3002 (as configured in .replit)
-    return `${protocol}//${hostname}:3002`;
+  // For local development
+  if (process.env.NODE_ENV === 'development') {
+    return 'http://localhost:5001';
   }
 
-  // Fallback for local development
-  return 'http://localhost:5001';
+  // Production - same domain
+  return '';
 };
 
-axios.defaults.baseURL = getBaseURL();
-axios.defaults.withCredentials = true;
+// Set up axios with retry logic for Replit
+const setupAxios = () => {
+  const baseURL = getBaseURL();
+  
+  axios.defaults.baseURL = baseURL;
+  axios.defaults.withCredentials = true;
+  axios.defaults.timeout = 10000;
+
+  // Add request interceptor for debugging
+  axios.interceptors.request.use(
+    (config) => {
+      console.log('Making request to:', config.baseURL + config.url);
+      return config;
+    },
+    (error) => {
+      console.error('Request error:', error);
+      return Promise.reject(error);
+    }
+  );
+
+  // Add response interceptor for error handling
+  axios.interceptors.response.use(
+    (response) => response,
+    (error) => {
+      console.error('Response error:', error.message);
+      if (error.code === 'ERR_NETWORK') {
+        console.error('Network error - check if backend server is running');
+      }
+      return Promise.reject(error);
+    }
+  );
+};
+
+setupAxios();
 
 function App() {
   const [enfermero, setEnfermero] = useState(null);
