@@ -26,7 +26,9 @@ app.use(cors({
       'http://localhost:3000',
       'http://localhost:3001',
       /https:\/\/.*\.replit\.dev$/,
-      /https:\/\/.*\.repl\.co$/
+      /https:\/\/.*\.replit\.dev:\d+$/,
+      /https:\/\/.*\.repl\.co$/,
+      /https:\/\/.*\.repl\.co:\d+$/
     ];
     
     // Check if origin matches any allowed pattern
