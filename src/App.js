@@ -18,8 +18,13 @@ const getBaseURL = () => {
   if (process.env.NODE_ENV === 'production') {
     return '';
   }
-  // In Replit environment, use the current hostname with port 5001
-  return `${window.location.protocol}//${window.location.hostname}:5001`;
+  // In Replit environment, check if we're running on replit.dev domain
+  if (window.location.hostname.includes('replit.dev')) {
+    // Use the main domain without port for external access
+    return `${window.location.protocol}//${window.location.hostname}`;
+  }
+  // Fallback for local development
+  return 'http://localhost:5001';
 };
 
 axios.defaults.baseURL = getBaseURL();
