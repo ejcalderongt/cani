@@ -1,79 +1,70 @@
-
 import React, { useState, useEffect } from 'react';
-import { Container, Card, Row, Col, Badge, Button, Nav, Tab, Form, Modal, Alert } from 'react-bootstrap';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Container, Card, Row, Col, Badge, Nav, Tab, Button, Form, Alert, Modal } from 'react-bootstrap';
 import axios from 'axios';
 
 function VerPaciente() {
   const { id } = useParams();
-  const [data, setData] = useState(null);
+  const navigate = useNavigate();
+  const [paciente, setPaciente] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState('info');
-  
+  const [error, setError] = useState('');
+  const [activeTab, setActiveTab] = useState('general');
+
   // Photo states
-  const [fotosPertenencias, setFotosPertenencias] = useState([]);
-  const [fotosMedicamentos, setFotosMedicamentos] = useState([]);
+  const [photos, setPhotos] = useState({ pertenencias: [], medicamentos: [] });
   const [showPhotoModal, setShowPhotoModal] = useState(false);
   const [photoType, setPhotoType] = useState('');
-  const [selectedFile, setSelectedFile] = useState(null);
-  const [photoDescription, setPhotoDescription] = useState('');
-  
-  // Appointments states
+  const [newPhoto, setNewPhoto] = useState({ file: null, descripcion: '' });
+
+  // Calendar states
   const [citas, setCitas] = useState([]);
   const [showCitaModal, setShowCitaModal] = useState(false);
-  const [editingCita, setEditingCita] = useState(null);
+  const [selectedDate, setSelectedDate] = useState('');
   const [citaForm, setCitaForm] = useState({
-    nombre_doctor: '',
-    fecha_cita: '',
-    hora_cita: '',
+    doctor: '',
+    hora: '',
+    motivo: '',
     anotaciones: ''
   });
-  const [currentDate, setCurrentDate] = useState(new Date());
-  
+  const [editingCita, setEditingCita] = useState(null);
+  const [currentMonth, setCurrentMonth] = useState(new Date());
+
   // Doping tests states
-  const [pruebasDoping, setPruebasDoping] = useState([]);
+  const [dopingTests, setDopingTests] = useState([]);
   const [showDopingModal, setShowDopingModal] = useState(false);
   const [dopingForm, setDopingForm] = useState({
-    fecha_prueba: '',
-    hora_prueba: '',
-    tipo_muestra: '',
-    resultado: '',
-    sustancias_detectadas: '',
+    fecha: '',
+    tipo: 'orina',
+    resultado: 'negativo',
     observaciones: ''
   });
-  
-  const [error, setError] = useState('');
 
   useEffect(() => {
-    const fetchPaciente = async () => {
-      try {
-        const response = await axios.get(`/api/pacientes/${id}`);
-        setData(response.data);
-        
-        // Fetch additional data
-        fetchFotos();
-        fetchCitas();
-        fetchPruebasDoping();
-      } catch (error) {
-        console.error('Error al cargar paciente:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-
     fetchPaciente();
+    fetchPhotos();
+    fetchCitas();
+    fetchDopingTests();
   }, [id]);
 
-  const fetchFotos = async () => {
+  const fetchPaciente = async () => {
     try {
-      const [pertenenciasRes, medicamentosRes] = await Promise.all([
-        axios.get(`/api/pacientes/${id}/fotos-pertenencias`),
-        axios.get(`/api/pacientes/${id}/fotos-medicamentos`)
-      ]);
-      setFotosPertenencias(pertenenciasRes.data);
-      setFotosMedicamentos(medicamentosRes.data);
+      const response = await axios.get(`/api/pacientes/${id}`);
+      setPaciente(response.data);
     } catch (error) {
-      console.error('Error al cargar fotos:', error);
+      setError('Error al cargar paciente');
+      console.error('Error:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchPhotos = async () => {
+    try {
+      const response = await axios.get(`/api/pacientes/${id}/photos`);
+      setPhotos(response.data);
+    } catch (error) {
+      console.error('Error fetching photos:', error);
     }
   };
 
@@ -82,71 +73,73 @@ function VerPaciente() {
       const response = await axios.get(`/api/pacientes/${id}/citas`);
       setCitas(response.data);
     } catch (error) {
-      console.error('Error al cargar citas:', error);
+      console.error('Error fetching citas:', error);
     }
   };
 
-  const fetchPruebasDoping = async () => {
+  const fetchDopingTests = async () => {
     try {
-      const response = await axios.get(`/api/pacientes/${id}/pruebas-doping`);
-      setPruebasDoping(response.data);
+      const response = await axios.get(`/api/pacientes/${id}/doping-tests`);
+      setDopingTests(response.data);
     } catch (error) {
-      console.error('Error al cargar pruebas de doping:', error);
+      console.error('Error fetching doping tests:', error);
     }
   };
 
-  const savePruebaDoping = async () => {
+  const handlePhotoSubmit = async (e) => {
+    e.preventDefault();
+    if (!newPhoto.file) return;
+
+    const formData = new FormData();
+    formData.append('photo', newPhoto.file);
+    formData.append('tipo', photoType);
+    formData.append('descripcion', newPhoto.descripcion);
+
     try {
-      await axios.post(`/api/pruebas-doping`, {
-        ...dopingForm,
-        paciente_id: id
+      await axios.post(`/api/pacientes/${id}/photos`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
       });
-      
-      setShowDopingModal(false);
-      setDopingForm({
-        fecha_prueba: '',
-        hora_prueba: '',
-        tipo_muestra: '',
-        resultado: '',
-        sustancias_detectadas: '',
-        observaciones: ''
-      });
-      fetchPruebasDoping();
-    } catch (error) {
-      console.error('Error al guardar prueba de doping:', error);
-      setError('Error al guardar la prueba de doping');
-    }
-  };
-
-  const handleFileChange = (e) => {
-    const file = e.target.files[0];
-    if (file) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        setSelectedFile(e.target.result);
-      };
-      reader.readAsDataURL(file);
-    }
-  };
-
-  const savePhoto = async () => {
-    if (!selectedFile) return;
-    
-    try {
-      const endpoint = photoType === 'pertenencias' ? 'fotos-pertenencias' : 'fotos-medicamentos';
-      await axios.post(`/api/pacientes/${id}/${endpoint}`, {
-        nombre_archivo: `foto_${Date.now()}.jpg`,
-        descripcion: photoDescription,
-        datos_imagen: selectedFile
-      });
-      
+      fetchPhotos();
       setShowPhotoModal(false);
-      setSelectedFile(null);
-      setPhotoDescription('');
-      fetchFotos();
+      setNewPhoto({ file: null, descripcion: '' });
     } catch (error) {
-      console.error('Error al guardar foto:', error);
-      setError('Error al guardar la foto');
+      console.error('Error uploading photo:', error);
+    }
+  };
+
+  const handleCitaSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      const citaData = {
+        ...citaForm,
+        fecha: selectedDate,
+        paciente_id: id
+      };
+
+      if (editingCita) {
+        await axios.put(`/api/citas/${editingCita.id}`, citaData);
+      } else {
+        await axios.post('/api/citas', citaData);
+      }
+
+      fetchCitas();
+      setShowCitaModal(false);
+      setCitaForm({ doctor: '', hora: '', motivo: '', anotaciones: '' });
+      setEditingCita(null);
+    } catch (error) {
+      console.error('Error saving cita:', error);
+    }
+  };
+
+  const handleDopingSubmit = async (e) => {
+    e.preventDefault();
+    try {
+      await axios.post(`/api/pacientes/${id}/doping-tests`, dopingForm);
+      fetchDopingTests();
+      setShowDopingModal(false);
+      setDopingForm({ fecha: '', tipo: 'orina', resultado: 'negativo', observaciones: '' });
+    } catch (error) {
+      console.error('Error saving doping test:', error);
     }
   };
 
@@ -155,59 +148,21 @@ function VerPaciente() {
     setShowPhotoModal(true);
   };
 
-  const openCitaModal = (cita = null) => {
+  const openCitaModal = (date, cita = null) => {
+    setSelectedDate(date);
+    setEditingCita(cita);
     if (cita) {
-      setEditingCita(cita);
       setCitaForm({
-        nombre_doctor: cita.nombre_doctor,
-        fecha_cita: cita.fecha_cita,
-        hora_cita: cita.hora_cita,
+        doctor: cita.doctor || '',
+        hora: cita.hora || '',
+        motivo: cita.motivo || '',
         anotaciones: cita.anotaciones || ''
-      });
-    } else {
-      setEditingCita(null);
-      setCitaForm({
-        nombre_doctor: '',
-        fecha_cita: '',
-        hora_cita: '',
-        anotaciones: ''
       });
     }
     setShowCitaModal(true);
   };
 
-  const saveCita = async () => {
-    try {
-      if (editingCita) {
-        await axios.put(`/api/citas/${editingCita.id}`, {
-          ...citaForm,
-          estado: 'programada'
-        });
-      } else {
-        await axios.post(`/api/pacientes/${id}/citas`, citaForm);
-      }
-      
-      setShowCitaModal(false);
-      fetchCitas();
-    } catch (error) {
-      console.error('Error al guardar cita:', error);
-      setError('Error al guardar la cita');
-    }
-  };
-
-  const deleteCita = async (citaId) => {
-    if (window.confirm('¿Está seguro de eliminar esta cita?')) {
-      try {
-        await axios.delete(`/api/citas/${citaId}`);
-        fetchCitas();
-      } catch (error) {
-        console.error('Error al eliminar cita:', error);
-        setError('Error al eliminar la cita');
-      }
-    }
-  };
-
-  // Calendar helper functions
+  // Calendar functions
   const getDaysInMonth = (date) => {
     return new Date(date.getFullYear(), date.getMonth() + 1, 0).getDate();
   };
@@ -216,50 +171,63 @@ function VerPaciente() {
     return new Date(date.getFullYear(), date.getMonth(), 1).getDay();
   };
 
-  const getCitasForDate = (day) => {
-    const dateStr = `${currentDate.getFullYear()}-${String(currentDate.getMonth() + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-    return citas.filter(cita => cita.fecha_cita === dateStr);
+  const formatDate = (date) => {
+    return date.toISOString().split('T')[0];
+  };
+
+  const getCitasForDate = (date) => {
+    const dateStr = formatDate(date);
+    return citas.filter(cita => cita.fecha === dateStr);
   };
 
   const renderCalendar = () => {
-    const daysInMonth = getDaysInMonth(currentDate);
-    const firstDay = getFirstDayOfMonth(currentDate);
+    const daysInMonth = getDaysInMonth(currentMonth);
+    const firstDay = getFirstDayOfMonth(currentMonth);
     const days = [];
-    
-    // Empty cells for days before the first day of the month
+    const today = new Date();
+
+    // Empty cells for days before the first day of month
     for (let i = 0; i < firstDay; i++) {
       days.push(<div key={`empty-${i}`} className="calendar-day empty"></div>);
     }
-    
+
     // Days of the month
     for (let day = 1; day <= daysInMonth; day++) {
-      const citasDelDia = getCitasForDate(day);
+      const date = new Date(currentMonth.getFullYear(), currentMonth.getMonth(), day);
+      const dateStr = formatDate(date);
+      const citasForDay = getCitasForDate(date);
+      const isToday = date.toDateString() === today.toDateString();
+
       days.push(
-        <div key={day} className="calendar-day" onClick={() => openCitaModal()}>
+        <div
+          key={day}
+          className={`calendar-day ${isToday ? 'today' : ''}`}
+          onClick={() => openCitaModal(dateStr)}
+        >
           <div className="day-number">{day}</div>
-          {citasDelDia.map((cita, index) => (
-            <div 
-              key={index} 
+          {citasForDay.map((cita, idx) => (
+            <div
+              key={idx}
               className="cita-item"
               onDoubleClick={(e) => {
                 e.stopPropagation();
-                openCitaModal(cita);
+                openCitaModal(dateStr, cita);
               }}
             >
-              <small>{cita.hora_cita} - Dr. {cita.nombre_doctor}</small>
+              {cita.hora} - {cita.doctor}
             </div>
           ))}
         </div>
       );
     }
-    
+
     return days;
   };
 
   if (loading) {
     return (
       <Container className="mt-4">
-        <div className="d-flex justify-content-center">
+        <div className="text-center">
           <div className="spinner-border" role="status">
             <span className="visually-hidden">Cargando...</span>
           </div>
@@ -268,331 +236,231 @@ function VerPaciente() {
     );
   }
 
-  if (!data) {
+  if (error || !paciente) {
     return (
       <Container className="mt-4">
-        <div className="alert alert-danger">Paciente no encontrado</div>
+        <Alert variant="danger">{error || 'Paciente no encontrado'}</Alert>
+        <Button variant="secondary" onClick={() => navigate('/pacientes')}>
+          Volver a Pacientes
+        </Button>
       </Container>
     );
   }
 
-  const { paciente, notas, medicamentos } = data;
-
   return (
-    <Container className="mt-4" style={{ padding: '0 15px' }}>
-      {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
-      
-      <div className="d-flex justify-content-between align-items-center mb-4 flex-wrap">
-        <h1 className="mb-2 mb-md-0">Paciente: {paciente.nombre} {paciente.apellidos}</h1>
-        <Button as={Link} to="/pacientes" variant="secondary" size="sm">
+    <Container className="mt-4">
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <h1>Paciente: {paciente.nombre} {paciente.apellidos}</h1>
+        <Button variant="secondary" onClick={() => navigate('/pacientes')}>
           Volver a Pacientes
         </Button>
       </div>
 
       <Tab.Container activeKey={activeTab} onSelect={setActiveTab}>
-        <Nav variant="tabs" className="mb-4 flex-wrap">
+        <Nav variant="tabs" className="mb-4">
           <Nav.Item>
-            <Nav.Link eventKey="info">📋 Información</Nav.Link>
+            <Nav.Link eventKey="general">Información General</Nav.Link>
           </Nav.Item>
           <Nav.Item>
-            <Nav.Link eventKey="pertenencias">🎒 Pertenencias</Nav.Link>
+            <Nav.Link eventKey="pertenencias">Pertenencias</Nav.Link>
           </Nav.Item>
           <Nav.Item>
-            <Nav.Link eventKey="medicamentos-fotos">💊 Medicamentos</Nav.Link>
+            <Nav.Link eventKey="medicamentos">Medicamentos</Nav.Link>
           </Nav.Item>
           <Nav.Item>
-            <Nav.Link eventKey="doping">🧪 Pruebas Doping</Nav.Link>
+            <Nav.Link eventKey="citas">Citas de Seguimiento</Nav.Link>
           </Nav.Item>
           <Nav.Item>
-            <Nav.Link eventKey="citas">📅 Citas</Nav.Link>
+            <Nav.Link eventKey="doping">Pruebas de Doping</Nav.Link>
           </Nav.Item>
         </Nav>
 
         <Tab.Content>
-          <Tab.Pane eventKey="info">
-            <Row>
-              <Col lg={8} className="mb-4">
-                <Card className="medical-card">
-                  <Card.Header>
-                    <h5>Datos Generales</h5>
-                  </Card.Header>
-                  <Card.Body>
-                    <Row>
-                      <Col md={6}>
-                        <p><strong>Expediente:</strong> {paciente.numero_expediente}</p>
-                        <p><strong>Nombre:</strong> {paciente.nombre} {paciente.apellidos}</p>
-                        <p><strong>Fecha de Nacimiento:</strong> {paciente.fecha_nacimiento}</p>
-                        <p><strong>Sexo:</strong> {paciente.sexo || 'No especificado'}</p>
-                        <p><strong>Documento:</strong> {paciente.documento_identidad}</p>
-                        <p><strong>Nacionalidad:</strong> {paciente.nacionalidad}</p>
-                      </Col>
-                      <Col md={6}>
-                        <p><strong>Tipo:</strong> <Badge bg={paciente.tipo_paciente === 'interno' ? 'danger' : 'success'}>{paciente.tipo_paciente}</Badge></p>
-                        <p><strong>Tipo de Sangre:</strong> {paciente.tipo_sangre}</p>
-                        {paciente.peso && <p><strong>Peso:</strong> {paciente.peso} kg</p>}
-                        {paciente.estatura && <p><strong>Estatura:</strong> {paciente.estatura} m</p>}
-                        <p><strong>Teléfono Principal:</strong> {paciente.telefono_principal}</p>
-                        {paciente.cuarto_asignado && <p><strong>Cuarto:</strong> {paciente.cuarto_asignado}</p>}
-                      </Col>
-                    </Row>
+          <Tab.Pane eventKey="general">
+            <Card className="medical-card">
+              <Card.Header>
+                <h5>Información General</h5>
+              </Card.Header>
+              <Card.Body>
+                <Row>
+                  <Col md={6}>
+                    <p><strong>Número de Expediente:</strong> {paciente.numero_expediente}</p>
+                    <p><strong>Fecha de Nacimiento:</strong> {new Date(paciente.fecha_nacimiento).toLocaleDateString('es-ES')}</p>
+                    <p><strong>Documento de Identidad:</strong> {paciente.documento_identidad}</p>
+                    <p><strong>Nacionalidad:</strong> {paciente.nacionalidad}</p>
+                    <p><strong>Tipo de Sangre:</strong> <Badge bg="info">{paciente.tipo_sangre}</Badge></p>
+                    {paciente.peso && <p><strong>Peso:</strong> {paciente.peso} kg</p>}
+                    {paciente.estatura && <p><strong>Estatura:</strong> {paciente.estatura} m</p>}
+                  </Col>
+                  <Col md={6}>
+                    <p><strong>Teléfono Principal:</strong> {paciente.telefono_principal}</p>
+                    {paciente.telefono_secundario && (
+                      <p><strong>Teléfono Secundario:</strong> {paciente.telefono_secundario}</p>
+                    )}
+                    <p><strong>Tipo de Paciente:</strong> <Badge bg="primary">{paciente.tipo_paciente}</Badge></p>
+                    {paciente.cuarto_asignado && (
+                      <p><strong>Cuarto Asignado:</strong> {paciente.cuarto_asignado}</p>
+                    )}
+                  </Col>
+                </Row>
 
-                    {/* Addiction Treatment Information */}
+                {/* Addiction Treatment Information */}
+                <hr />
+                <h6 className="text-primary mb-3">Información del Tratamiento</h6>
+                <Row>
+                  <Col md={6}>
+                    {paciente.fecha_ingreso && (
+                      <p><strong>Fecha/Hora Ingreso:</strong> {new Date(paciente.fecha_ingreso).toLocaleString('es-ES')}</p>
+                    )}
+                    {paciente.motivo_ingreso && (
+                      <p><strong>Motivo:</strong> <Badge bg="info">{paciente.motivo_ingreso}</Badge></p>
+                    )}
+                    {paciente.fase_tratamiento && (
+                      <p><strong>Fase:</strong> <Badge bg="warning">{paciente.fase_tratamiento}</Badge></p>
+                    )}
+                  </Col>
+                  <Col md={6}>
+                    {paciente.unidad_cama && <p><strong>Unidad/Cama:</strong> {paciente.unidad_cama}</p>}
+                    {paciente.medico_tratante && <p><strong>Médico Tratante:</strong> {paciente.medico_tratante}</p>}
+                    {paciente.equipo_tratante && <p><strong>Equipo Tratante:</strong> {paciente.equipo_tratante}</p>}
+                  </Col>
+                </Row>
+
+                {paciente.contacto_emergencia_nombre && (
+                  <div className="mt-3">
+                    <strong>Contacto de Emergencia:</strong>
+                    <p>{paciente.contacto_emergencia_nombre} - {paciente.contacto_emergencia_telefono}</p>
+                  </div>
+                )}
+
+                {/* Risks Assessment */}
+                {(paciente.riesgo_suicidio || paciente.riesgo_violencia || paciente.riesgo_fuga || paciente.riesgo_caidas) && (
+                  <>
                     <hr />
-                    <h6 className="text-primary mb-3">Información del Tratamiento</h6>
+                    <h6 className="text-warning mb-3">Riesgos al Ingreso</h6>
                     <Row>
-                      <Col md={6}>
-                        {paciente.fecha_ingreso && (
-                          <p><strong>Fecha/Hora Ingreso:</strong> {new Date(paciente.fecha_ingreso).toLocaleString('es-ES')}</p>
+                      <Col md={12}>
+                        {paciente.riesgo_suicidio && (
+                          <Badge bg="danger" className="me-2 mb-2">Riesgo de Suicidio/Autoagresión</Badge>
                         )}
-                        {paciente.motivo_ingreso && (
-                          <p><strong>Motivo:</strong> <Badge bg="info">{paciente.motivo_ingreso}</Badge></p>
+                        {paciente.riesgo_violencia && (
+                          <Badge bg="danger" className="me-2 mb-2">Riesgo de Violencia</Badge>
                         )}
-                        {paciente.fase_tratamiento && (
-                          <p><strong>Fase:</strong> <Badge bg="warning">{paciente.fase_tratamiento}</Badge></p>
+                        {paciente.riesgo_fuga && (
+                          <Badge bg="warning" className="me-2 mb-2">Riesgo de Fuga</Badge>
+                        )}
+                        {paciente.riesgo_caidas && (
+                          <Badge bg="warning" className="me-2 mb-2">Riesgo de Caídas</Badge>
                         )}
                       </Col>
-                      <Col md={6}>
-                        {paciente.unidad_cama && <p><strong>Unidad/Cama:</strong> {paciente.unidad_cama}</p>}
-                        {paciente.medico_tratante && <p><strong>Médico Tratante:</strong> {paciente.medico_tratante}</p>}
-                        {paciente.equipo_tratante && <p><strong>Equipo Tratante:</strong> {paciente.equipo_tratante}</p>}
-                      </Col>
                     </Row>
+                  </>
+                )}
 
-                    {/* Risk Factors */}
-                    {(paciente.riesgo_suicidio || paciente.riesgo_violencia || paciente.riesgo_fuga || paciente.riesgo_caidas) && (
-                      <>
-                        <hr />
-                        <h6 className="text-warning mb-3">⚠️ Riesgos Identificados</h6>
-                        <div className="d-flex flex-wrap gap-2">
-                          {paciente.riesgo_suicidio && <Badge bg="danger">Suicidio/Autoagresión</Badge>}
-                          {paciente.riesgo_violencia && <Badge bg="danger">Violencia</Badge>}
-                          {paciente.riesgo_fuga && <Badge bg="warning">Fuga</Badge>}
-                          {paciente.riesgo_caidas && <Badge bg="secondary">Caídas</Badge>}
-                        </div>
-                      </>
-                    )}
-                    </Row>
-                    {paciente.contacto_emergencia_nombre && (
-                      <div className="mt-3">
-                        <strong>Contacto de Emergencia:</strong>
-                        <p>{paciente.contacto_emergencia_nombre} ({paciente.contacto_emergencia_telefono})</p>
-                      </div>
-                    )}
-                    {paciente.padecimientos && (
-                      <div className="mt-3">
-                        <strong>Padecimientos:</strong>
-                        <p>{paciente.padecimientos}</p>
-                      </div>
-                    )}
-                    {paciente.informacion_general && (
-                      <div className="mt-3">
-                        <strong>Información General:</strong>
-                        <p>{paciente.informacion_general}</p>
-                      </div>
-                    )}
-                  </Card.Body>
-                </Card>
+                {paciente.padecimientos && (
+                  <div className="mt-3">
+                    <strong>Padecimientos:</strong>
+                    <p>{paciente.padecimientos}</p>
+                  </div>
+                )}
 
-                <Card className="medical-card mt-4">
-                  <Card.Header>
-                    <h5>Medicamentos Asignados</h5>
-                  </Card.Header>
-                  <Card.Body>
-                    {medicamentos.length === 0 ? (
-                      <p className="text-muted">No hay medicamentos asignados</p>
-                    ) : (
-                      medicamentos.map((medicamento, index) => (
-                        <div key={index} className="border-bottom mb-2 pb-2">
-                          <strong>{medicamento.medicamento_nombre}</strong> - {medicamento.dosis}<br />
-                          <small className="text-muted">{medicamento.frecuencia} | Horarios: {medicamento.horarios}</small>
-                        </div>
-                      ))
-                    )}
-                  </Card.Body>
-                </Card>
-              </Col>
-
-              <Col lg={4}>
-                <Card className="medical-card">
-                  <Card.Header>
-                    <h5>Notas de Enfermería Recientes</h5>
-                  </Card.Header>
-                  <Card.Body>
-                    {notas.length === 0 ? (
-                      <p className="text-muted">No hay notas registradas</p>
-                    ) : (
-                      notas.slice(0, 5).map((nota, index) => (
-                        <div key={index} className="border-bottom mb-2 pb-2">
-                          <div className="d-flex justify-content-between flex-wrap">
-                            <strong>{nota.fecha} - {nota.hora}</strong>
-                            <small className="text-muted">{nota.enfermero_nombre} {nota.enfermero_apellidos}</small>
-                          </div>
-                          <p className="mt-1">{nota.observaciones}</p>
-                        </div>
-                      ))
-                    )}
-                  </Card.Body>
-                </Card>
-              </Col>
-            </Row>
+                {paciente.informacion_general && (
+                  <div className="mt-3">
+                    <strong>Información General:</strong>
+                    <p>{paciente.informacion_general}</p>
+                  </div>
+                )}
+              </Card.Body>
+            </Card>
           </Tab.Pane>
 
           <Tab.Pane eventKey="pertenencias">
             <Card className="medical-card">
-              <Card.Header className="d-flex justify-content-between align-items-center flex-wrap">
-                <h5 className="mb-2 mb-md-0">Fotos de Pertenencias Personales</h5>
-                <Button variant="primary" size="sm" onClick={() => openPhotoModal('pertenencias')}>
-                  📷 Agregar Foto
+              <Card.Header className="d-flex justify-content-between align-items-center">
+                <h5>Pertenencias Personales</h5>
+                <Button size="sm" onClick={() => openPhotoModal('pertenencias')}>
+                  Agregar Foto
                 </Button>
               </Card.Header>
               <Card.Body>
                 <Row>
-                  {fotosPertenencias.map((foto, index) => (
-                    <Col key={index} xs={12} sm={6} md={4} lg={3} className="mb-3">
-                      <Card className="h-100">
-                        <Card.Img 
-                          variant="top" 
-                          src={foto.datos_imagen} 
-                          style={{ height: '200px', objectFit: 'cover' }}
-                        />
-                        <Card.Body>
-                          <Card.Text className="small">{foto.descripcion}</Card.Text>
-                          <small className="text-muted">{new Date(foto.fecha_registro).toLocaleDateString()}</small>
-                        </Card.Body>
-                      </Card>
+                  {photos.pertenencias?.map((photo, idx) => (
+                    <Col md={4} key={idx} className="mb-3">
+                      <div className="photo-item">
+                        <img src={photo.url} alt={photo.descripcion} />
+                        <div className="photo-description">
+                          <small>{photo.descripcion}</small>
+                          <br />
+                          <small className="text-muted">
+                            {new Date(photo.fecha_registro).toLocaleDateString('es-ES')}
+                          </small>
+                        </div>
+                      </div>
                     </Col>
                   ))}
                 </Row>
-                {fotosPertenencias.length === 0 && (
-                  <p className="text-muted text-center">No hay fotos de pertenencias registradas</p>
+                {(!photos.pertenencias || photos.pertenencias.length === 0) && (
+                  <p className="text-muted">No hay fotos de pertenencias registradas.</p>
                 )}
               </Card.Body>
             </Card>
           </Tab.Pane>
 
-          <Tab.Pane eventKey="medicamentos-fotos">
+          <Tab.Pane eventKey="medicamentos">
             <Card className="medical-card">
-              <Card.Header className="d-flex justify-content-between align-items-center flex-wrap">
-                <h5 className="mb-2 mb-md-0">Fotos de Medicamentos Recibidos</h5>
-                <Button variant="primary" size="sm" onClick={() => openPhotoModal('medicamentos')}>
-                  📷 Agregar Foto
+              <Card.Header className="d-flex justify-content-between align-items-center">
+                <h5>Medicamentos Recibidos</h5>
+                <Button size="sm" onClick={() => openPhotoModal('medicamentos')}>
+                  Agregar Foto
                 </Button>
               </Card.Header>
               <Card.Body>
                 <Row>
-                  {fotosMedicamentos.map((foto, index) => (
-                    <Col key={index} xs={12} sm={6} md={4} lg={3} className="mb-3">
-                      <Card className="h-100">
-                        <Card.Img 
-                          variant="top" 
-                          src={foto.datos_imagen} 
-                          style={{ height: '200px', objectFit: 'cover' }}
-                        />
-                        <Card.Body>
-                          <Card.Text className="small">{foto.descripcion}</Card.Text>
-                          <small className="text-muted">{new Date(foto.fecha_registro).toLocaleDateString()}</small>
-                        </Card.Body>
-                      </Card>
+                  {photos.medicamentos?.map((photo, idx) => (
+                    <Col md={4} key={idx} className="mb-3">
+                      <div className="photo-item">
+                        <img src={photo.url} alt={photo.descripcion} />
+                        <div className="photo-description">
+                          <small>{photo.descripcion}</small>
+                          <br />
+                          <small className="text-muted">
+                            {new Date(photo.fecha_registro).toLocaleDateString('es-ES')}
+                          </small>
+                        </div>
+                      </div>
                     </Col>
                   ))}
                 </Row>
-                {fotosMedicamentos.length === 0 && (
-                  <p className="text-muted text-center">No hay fotos de medicamentos registradas</p>
+                {(!photos.medicamentos || photos.medicamentos.length === 0) && (
+                  <p className="text-muted">No hay fotos de medicamentos registradas.</p>
                 )}
-              </Card.Body>
-            </Card>
-          </Tab.Pane>
-
-          <Tab.Pane eventKey="doping">
-            <Card className="medical-card">
-              <Card.Header className="d-flex justify-content-between align-items-center flex-wrap">
-                <h5 className="mb-2 mb-md-0">Registro y Control de Pruebas de Doping</h5>
-                <Button variant="primary" size="sm" onClick={() => setShowDopingModal(true)}>
-                  ➕ Nueva Prueba
-                </Button>
-              </Card.Header>
-              <Card.Body>
-                <div className="table-responsive">
-                  <Table striped hover size="sm">
-                    <thead>
-                      <tr>
-                        <th>Fecha</th>
-                        <th>Hora</th>
-                        <th>Tipo Muestra</th>
-                        <th>Resultado</th>
-                        <th>Sustancias</th>
-                        <th>Enfermero</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {pruebasDoping.length === 0 ? (
-                        <tr>
-                          <td colSpan="6" className="text-center text-muted">
-                            No hay pruebas de doping registradas
-                          </td>
-                        </tr>
-                      ) : (
-                        pruebasDoping.map((prueba) => (
-                          <tr key={prueba.id}>
-                            <td>{prueba.fecha_prueba}</td>
-                            <td>{prueba.hora_prueba}</td>
-                            <td>
-                              <Badge bg={prueba.tipo_muestra === 'sangre' ? 'danger' : 'warning'}>
-                                {prueba.tipo_muestra}
-                              </Badge>
-                            </td>
-                            <td>
-                              <Badge bg={prueba.resultado === 'positivo' ? 'danger' : 'success'}>
-                                {prueba.resultado}
-                              </Badge>
-                            </td>
-                            <td>{prueba.sustancias_detectadas || '-'}</td>
-                            <td>
-                              <small>
-                                {prueba.enfermero_nombre} {prueba.enfermero_apellidos}
-                              </small>
-                            </td>
-                          </tr>
-                        ))
-                      )}
-                    </tbody>
-                  </Table>
-                </div>
               </Card.Body>
             </Card>
           </Tab.Pane>
 
           <Tab.Pane eventKey="citas">
             <Card className="medical-card">
-              <Card.Header className="d-flex justify-content-between align-items-center flex-wrap">
-                <h5 className="mb-2 mb-md-0">Control de Citas de Seguimiento</h5>
-                <Button variant="primary" size="sm" onClick={() => openCitaModal()}>
-                  ➕ Nueva Cita
-                </Button>
-              </Card.Header>
-              <Card.Body>
-                <div className="calendar-header d-flex justify-content-between align-items-center mb-3 flex-wrap">
+              <Card.Header>
+                <h5>Calendario de Citas de Seguimiento</h5>
+                <div className="d-flex justify-content-between align-items-center mt-2">
                   <Button 
-                    variant="outline-secondary" 
-                    size="sm"
-                    onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1))}
+                    size="sm" 
+                    onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))}
                   >
-                    ‹ Anterior
+                    &lt;
                   </Button>
-                  <h6 className="mb-0">
-                    {currentDate.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}
-                  </h6>
+                  <h6>{currentMonth.toLocaleDateString('es-ES', { month: 'long', year: 'numeric' })}</h6>
                   <Button 
-                    variant="outline-secondary" 
-                    size="sm"
-                    onClick={() => setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1))}
+                    size="sm" 
+                    onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() + 1))}
                   >
-                    Siguiente ›
+                    &gt;
                   </Button>
                 </div>
-                
-                <div className="calendar-grid">
-                  <div className="calendar-weekdays">
+              </Card.Header>
+              <Card.Body>
+                <div className="calendar-container">
+                  <div className="calendar-header">
                     {['Dom', 'Lun', 'Mar', 'Mié', 'Jue', 'Vie', 'Sáb'].map(day => (
                       <div key={day} className="weekday">{day}</div>
                     ))}
@@ -604,140 +472,148 @@ function VerPaciente() {
               </Card.Body>
             </Card>
           </Tab.Pane>
+
+          <Tab.Pane eventKey="doping">
+            <Card className="medical-card">
+              <Card.Header className="d-flex justify-content-between align-items-center">
+                <h5>Pruebas de Doping</h5>
+                <Button size="sm" onClick={() => setShowDopingModal(true)}>
+                  Nueva Prueba
+                </Button>
+              </Card.Header>
+              <Card.Body>
+                <div className="table-responsive">
+                  <table className="table">
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Tipo</th>
+                        <th>Resultado</th>
+                        <th>Observaciones</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {dopingTests.map((test, idx) => (
+                        <tr key={idx}>
+                          <td>{new Date(test.fecha).toLocaleDateString('es-ES')}</td>
+                          <td>
+                            <Badge bg={test.tipo === 'sangre' ? 'danger' : 'info'}>
+                              {test.tipo}
+                            </Badge>
+                          </td>
+                          <td>
+                            <Badge bg={test.resultado === 'positivo' ? 'danger' : 'success'}>
+                              {test.resultado}
+                            </Badge>
+                          </td>
+                          <td>{test.observaciones}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+                {dopingTests.length === 0 && (
+                  <p className="text-muted">No hay pruebas de doping registradas.</p>
+                )}
+              </Card.Body>
+            </Card>
+          </Tab.Pane>
         </Tab.Content>
       </Tab.Container>
 
       {/* Photo Modal */}
-      <Modal show={showPhotoModal} onHide={() => setShowPhotoModal(false)} size="lg">
+      <Modal show={showPhotoModal} onHide={() => setShowPhotoModal(false)}>
         <Modal.Header closeButton>
-          <Modal.Title>
-            Agregar Foto de {photoType === 'pertenencias' ? 'Pertenencias' : 'Medicamentos'}
-          </Modal.Title>
+          <Modal.Title>Agregar Foto - {photoType === 'pertenencias' ? 'Pertenencias' : 'Medicamentos'}</Modal.Title>
         </Modal.Header>
-        <Modal.Body>
-          <Form>
+        <Form onSubmit={handlePhotoSubmit}>
+          <Modal.Body>
             <Form.Group className="mb-3">
               <Form.Label>Seleccionar Foto</Form.Label>
               <Form.Control
                 type="file"
                 accept="image/*"
-                onChange={handleFileChange}
-                capture="environment"
+                onChange={(e) => setNewPhoto({...newPhoto, file: e.target.files[0]})}
+                required
               />
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Descripción</Form.Label>
               <Form.Control
                 as="textarea"
+                value={newPhoto.descripcion}
+                onChange={(e) => setNewPhoto({...newPhoto, descripcion: e.target.value})}
                 rows={3}
-                value={photoDescription}
-                onChange={(e) => setPhotoDescription(e.target.value)}
-                placeholder="Describe lo que se muestra en la foto..."
-              />
-            </Form.Group>
-            {selectedFile && (
-              <div className="text-center">
-                <img 
-                  src={selectedFile} 
-                  alt="Preview" 
-                  style={{ maxWidth: '100%', maxHeight: '300px', objectFit: 'contain' }}
-                />
-              </div>
-            )}
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowPhotoModal(false)}>
-            Cancelar
-          </Button>
-          <Button variant="primary" onClick={savePhoto} disabled={!selectedFile}>
-            Guardar Foto
-          </Button>
-        </Modal.Footer>
-      </Modal>
-
-      {/* Appointment Modal */}
-      <Modal show={showCitaModal} onHide={() => setShowCitaModal(false)}>
-        <Modal.Header closeButton>
-          <Modal.Title>
-            {editingCita ? 'Editar Cita' : 'Nueva Cita de Seguimiento'}
-          </Modal.Title>
-        </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Form.Group className="mb-3">
-              <Form.Label>Nombre del Doctor</Form.Label>
-              <Form.Control
-                type="text"
-                value={citaForm.nombre_doctor}
-                onChange={(e) => setCitaForm({...citaForm, nombre_doctor: e.target.value})}
-                placeholder="Dr. Juan Pérez"
                 required
               />
             </Form.Group>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Fecha de la Cita</Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={citaForm.fecha_cita}
-                    onChange={(e) => setCitaForm({...citaForm, fecha_cita: e.target.value})}
-                    required
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Hora de la Cita</Form.Label>
-                  <Form.Control
-                    type="time"
-                    value={citaForm.hora_cita}
-                    onChange={(e) => setCitaForm({...citaForm, hora_cita: e.target.value})}
-                    required
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowPhotoModal(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" variant="primary">
+              Guardar Foto
+            </Button>
+          </Modal.Footer>
+        </Form>
+      </Modal>
+
+      {/* Cita Modal */}
+      <Modal show={showCitaModal} onHide={() => setShowCitaModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>
+            {editingCita ? 'Editar Cita' : 'Nueva Cita'} - {selectedDate}
+          </Modal.Title>
+        </Modal.Header>
+        <Form onSubmit={handleCitaSubmit}>
+          <Modal.Body>
+            <Form.Group className="mb-3">
+              <Form.Label>Doctor</Form.Label>
+              <Form.Control
+                type="text"
+                value={citaForm.doctor}
+                onChange={(e) => setCitaForm({...citaForm, doctor: e.target.value})}
+                required
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Hora</Form.Label>
+              <Form.Control
+                type="time"
+                value={citaForm.hora}
+                onChange={(e) => setCitaForm({...citaForm, hora: e.target.value})}
+                required
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Motivo</Form.Label>
+              <Form.Control
+                type="text"
+                value={citaForm.motivo}
+                onChange={(e) => setCitaForm({...citaForm, motivo: e.target.value})}
+                required
+              />
+            </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Anotaciones del Doctor</Form.Label>
               <Form.Control
                 as="textarea"
-                rows={4}
                 value={citaForm.anotaciones}
                 onChange={(e) => setCitaForm({...citaForm, anotaciones: e.target.value})}
-                placeholder="Observaciones, indicaciones o notas sobre la cita..."
+                rows={3}
               />
             </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer className="d-flex justify-content-between">
-          <div>
-            {editingCita && (
-              <Button 
-                variant="danger" 
-                onClick={() => {
-                  deleteCita(editingCita.id);
-                  setShowCitaModal(false);
-                }}
-              >
-                🗑️ Eliminar
-              </Button>
-            )}
-          </div>
-          <div>
-            <Button variant="secondary" onClick={() => setShowCitaModal(false)} className="me-2">
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowCitaModal(false)}>
               Cancelar
             </Button>
-            <Button 
-              variant="primary" 
-              onClick={saveCita}
-              disabled={!citaForm.nombre_doctor || !citaForm.fecha_cita || !citaForm.hora_cita}
-            >
+            <Button type="submit" variant="primary">
               {editingCita ? 'Actualizar' : 'Guardar'} Cita
             </Button>
-          </div>
-        </Modal.Footer>
+          </Modal.Footer>
+        </Form>
       </Modal>
 
       {/* Doping Test Modal */}
@@ -745,96 +621,58 @@ function VerPaciente() {
         <Modal.Header closeButton>
           <Modal.Title>Nueva Prueba de Doping</Modal.Title>
         </Modal.Header>
-        <Modal.Body>
-          <Form>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Fecha de la Prueba</Form.Label>
-                  <Form.Control
-                    type="date"
-                    value={dopingForm.fecha_prueba}
-                    onChange={(e) => setDopingForm({...dopingForm, fecha_prueba: e.target.value})}
-                    required
-                  />
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Hora de la Prueba</Form.Label>
-                  <Form.Control
-                    type="time"
-                    value={dopingForm.hora_prueba}
-                    onChange={(e) => setDopingForm({...dopingForm, hora_prueba: e.target.value})}
-                    required
-                  />
-                </Form.Group>
-              </Col>
-            </Row>
-            <Row>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Tipo de Muestra</Form.Label>
-                  <Form.Select
-                    value={dopingForm.tipo_muestra}
-                    onChange={(e) => setDopingForm({...dopingForm, tipo_muestra: e.target.value})}
-                    required
-                  >
-                    <option value="">Seleccionar...</option>
-                    <option value="sangre">Sangre</option>
-                    <option value="orina">Orina</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-              <Col md={6}>
-                <Form.Group className="mb-3">
-                  <Form.Label>Resultado</Form.Label>
-                  <Form.Select
-                    value={dopingForm.resultado}
-                    onChange={(e) => setDopingForm({...dopingForm, resultado: e.target.value})}
-                    required
-                  >
-                    <option value="">Seleccionar...</option>
-                    <option value="positivo">Positivo</option>
-                    <option value="negativo">Negativo</option>
-                  </Form.Select>
-                </Form.Group>
-              </Col>
-            </Row>
+        <Form onSubmit={handleDopingSubmit}>
+          <Modal.Body>
             <Form.Group className="mb-3">
-              <Form.Label>Sustancias Detectadas</Form.Label>
+              <Form.Label>Fecha</Form.Label>
               <Form.Control
-                type="text"
-                value={dopingForm.sustancias_detectadas}
-                onChange={(e) => setDopingForm({...dopingForm, sustancias_detectadas: e.target.value})}
-                placeholder="Cocaína, Marihuana, Alcohol, etc."
+                type="date"
+                value={dopingForm.fecha}
+                onChange={(e) => setDopingForm({...dopingForm, fecha: e.target.value})}
+                required
               />
-              <small className="text-muted">Solo llenar si el resultado es positivo</small>
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Tipo de Muestra</Form.Label>
+              <Form.Select
+                value={dopingForm.tipo}
+                onChange={(e) => setDopingForm({...dopingForm, tipo: e.target.value})}
+                required
+              >
+                <option value="orina">Orina</option>
+                <option value="sangre">Sangre</option>
+              </Form.Select>
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Resultado</Form.Label>
+              <Form.Select
+                value={dopingForm.resultado}
+                onChange={(e) => setDopingForm({...dopingForm, resultado: e.target.value})}
+                required
+              >
+                <option value="negativo">Negativo</option>
+                <option value="positivo">Positivo</option>
+              </Form.Select>
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Label>Observaciones</Form.Label>
               <Form.Control
                 as="textarea"
-                rows={3}
                 value={dopingForm.observaciones}
                 onChange={(e) => setDopingForm({...dopingForm, observaciones: e.target.value})}
-                placeholder="Observaciones sobre la prueba..."
+                rows={3}
               />
             </Form.Group>
-          </Form>
-        </Modal.Body>
-        <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowDopingModal(false)}>
-            Cancelar
-          </Button>
-          <Button 
-            variant="primary" 
-            onClick={savePruebaDoping}
-            disabled={!dopingForm.fecha_prueba || !dopingForm.hora_prueba || !dopingForm.tipo_muestra || !dopingForm.resultado}
-          >
-            Guardar Prueba
-          </Button>
-        </Modal.Footer>
+          </Modal.Body>
+          <Modal.Footer>
+            <Button variant="secondary" onClick={() => setShowDopingModal(false)}>
+              Cancelar
+            </Button>
+            <Button type="submit" variant="primary">
+              Guardar Prueba
+            </Button>
+          </Modal.Footer>
+        </Form>
       </Modal>
     </Container>
   );
