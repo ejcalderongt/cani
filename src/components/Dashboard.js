@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Link } from 'react-router-dom';
 
@@ -66,6 +65,20 @@ function Dashboard() {
       icon: '📊',
       path: '/pacientes',
       color: 'var(--warning)'
+    },
+    {
+      title: 'Signos Vitales',
+      description: 'Capturar y revisar signos vitales',
+      icon: '❤️',
+      path: '/signos-vitales',
+      color: 'var(--info)'
+    },
+    {
+      title: 'Pruebas de Doping',
+      description: 'Registrar y controlar pruebas de doping',
+      icon: '🧪',
+      path: '/pruebas-doping',
+      color: 'var(--purple)'
     }
   ];
 
@@ -75,7 +88,7 @@ function Dashboard() {
       <div style={{ marginBottom: 'var(--space-8)' }}>
         <h1 style={{ marginBottom: 'var(--space-2)' }}>Panel de Control</h1>
         <p className="text-muted">
-          Resumen general del sistema hospitalario - {new Date().toLocaleDateString('es-ES', { 
+          Resumen general del sistema de la Clínica de Tratamiento de Adicciones - {new Date().toLocaleDateString('es-ES', { 
             weekday: 'long', 
             year: 'numeric', 
             month: 'long', 

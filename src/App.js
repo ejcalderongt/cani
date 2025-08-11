@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
@@ -10,6 +9,7 @@ import NuevoPaciente from './components/NuevoPaciente';
 import VerPaciente from './components/VerPaciente';
 import NotasEnfermeria from './components/NotasEnfermeria';
 import NuevaNota from './components/NuevaNota';
+import SignosVitales from './components/SignosVitales'; // Assuming SignosVitales component will be created
 import Medicamentos from './components/Medicamentos';
 import NuevoMedicamento from './components/NuevoMedicamento';
 import MantenimientoUsuarios from './components/MantenimientoUsuarios';
@@ -21,18 +21,18 @@ const getBaseURL = () => {
   if (process.env.NODE_ENV === 'production') {
     return '';
   }
-  
+
   // In Replit environment, try different port configurations
   if (window.location.hostname.includes('replit.dev')) {
     // For Replit, we need to figure out the correct port mapping
     // Let's try the same domain but different ports
     const hostname = window.location.hostname;
     const protocol = window.location.protocol;
-    
+
     // First try port 3002 (as configured in .replit)
     return `${protocol}//${hostname}:3002`;
   }
-  
+
   // Fallback for local development
   return 'http://localhost:5001';
 };
@@ -92,7 +92,7 @@ function App() {
     <Router>
       <div className="App">
         {enfermero && <Navbar enfermero={enfermero} onLogout={handleLogout} />}
-        
+
         <Routes>
           <Route
             path="/login"
@@ -100,77 +100,84 @@ function App() {
               enfermero ? <Navigate to="/" /> : <Login onLogin={handleLogin} />
             }
           />
-          
+
           <Route
             path="/"
             element={
               enfermero ? <Dashboard /> : <Navigate to="/login" />
             }
           />
-          
+
           <Route
             path="/pacientes"
             element={
               enfermero ? <Pacientes /> : <Navigate to="/login" />
             }
           />
-          
+
           <Route
             path="/pacientes/nuevo"
             element={
               enfermero ? <NuevoPaciente /> : <Navigate to="/login" />
             }
           />
-          
+
           <Route
             path="/pacientes/:id"
             element={
               enfermero ? <VerPaciente /> : <Navigate to="/login" />
             }
           />
-          
+
           <Route
             path="/notas"
             element={
               enfermero ? <NotasEnfermeria /> : <Navigate to="/login" />
             }
           />
-          
+
           <Route
             path="/notas/nueva"
             element={
               enfermero ? <NuevaNota /> : <Navigate to="/login" />
             }
           />
-          
+
+          <Route
+            path="/signos-vitales"
+            element={
+              enfermero ? <SignosVitales /> : <Navigate to="/login" />
+            }
+          />
+
           <Route
             path="/medicamentos"
             element={
               enfermero ? <Medicamentos /> : <Navigate to="/login" />
             }
           />
-          
+
           <Route
             path="/medicamentos/nuevo"
             element={
               enfermero ? <NuevoMedicamento /> : <Navigate to="/login" />
             }
           />
-          
+
           <Route
             path="/imprimir-notas"
             element={
               enfermero ? <ImprimirNotas /> : <Navigate to="/login" />
             }
           />
-          
+
           <Route
             path="/admin/usuarios"
             element={
               enfermero?.codigo === 'admin' ? <MantenimientoUsuarios /> : <Navigate to="/" />
             }
           />
-          
+
           <Route
             path="/admin/sistema"
             element={

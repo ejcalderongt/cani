@@ -15,8 +15,9 @@ function Navbar({ enfermero, onLogout }) {
           <Nav className="me-auto">
             <Nav.Link as={Link} to="/">Dashboard</Nav.Link>
             <Nav.Link as={Link} to="/pacientes">Pacientes</Nav.Link>
-            <Nav.Link as={Link} to="/notas">Notas de Enfermería</Nav.Link>
-            <Nav.Link as={Link} to="/medicamentos">Medicamentos</Nav.Link>
+            <Nav.Link as={Link} to="/notas">📝 Notas</Nav.Link>
+            <Nav.Link as={Link} to="/signos-vitales">❤️ Signos Vitales</Nav.Link>
+            <Nav.Link as={Link} to="/medicamentos">💊 Medicamentos</Nav.Link>
             <Nav.Link as={Link} to="/imprimir-notas">Imprimir Notas</Nav.Link>
             {enfermero?.codigo === 'admin' && (
               <NavDropdown title="Administración" id="admin-dropdown">

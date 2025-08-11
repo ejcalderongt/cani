@@ -234,6 +234,55 @@ async function initDatabase() {
       )
     `);
 
+    // Add sexo column to pacientes if it doesn't exist
+    try {
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS sexo VARCHAR(20)`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fecha_ingreso TIMESTAMP`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS motivo_ingreso VARCHAR(100)`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fase_tratamiento VARCHAR(50)`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS unidad_cama VARCHAR(20)`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS medico_tratante VARCHAR(100)`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS equipo_tratante TEXT`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS riesgo_suicidio BOOLEAN DEFAULT false`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS riesgo_violencia BOOLEAN DEFAULT false`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS riesgo_fuga BOOLEAN DEFAULT false`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS riesgo_caidas BOOLEAN DEFAULT false`);
+    } catch (error) {
+      // Columns might already exist
+    }
+
+    // Create signos_vitales table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS signos_vitales (
+        id SERIAL PRIMARY KEY,
+        paciente_id INTEGER REFERENCES pacientes(id),
+        enfermero_id INTEGER REFERENCES enfermeros(id),
+        fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        presion_sistolica INTEGER,
+        presion_diastolica INTEGER,
+        saturacion_oxigeno DECIMAL(4,1),
+        frecuencia_cardiaca INTEGER,
+        temperatura DECIMAL(3,1),
+        observaciones TEXT
+      )
+    `);
+
+    // Create pruebas_doping table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS pruebas_doping (
+        id SERIAL PRIMARY KEY,
+        paciente_id INTEGER REFERENCES pacientes(id),
+        enfermero_id INTEGER REFERENCES enfermeros(id),
+        fecha_prueba DATE NOT NULL,
+        hora_prueba TIME NOT NULL,
+        tipo_muestra VARCHAR(20) NOT NULL, -- 'sangre' o 'orina'
+        resultado VARCHAR(20) NOT NULL, -- 'positivo' o 'negativo'
+        sustancias_detectadas TEXT,
+        observaciones TEXT,
+        fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Insert default users if they don't exist
     const existingUsers = await pool.query('SELECT codigo FROM enfermeros WHERE codigo IN ($1, $2, $3, $4)', ['admin', 'erick', 'cintia', 'ENF001']);
     const existingCodes = existingUsers.rows.map(row => row.codigo);
@@ -703,6 +752,128 @@ app.delete('/api/citas/:id', requireAuth, async (req, res) => {
   }
 });
 
+// Vital signs endpoints
+app.get('/api/signos-vitales', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT sv.*, 
+             p.nombre as paciente_nombre, p.apellidos as paciente_apellidos, p.numero_expediente,
+             e.nombre as enfermero_nombre, e.apellidos as enfermero_apellidos
+      FROM signos_vitales sv
+      JOIN pacientes p ON sv.paciente_id = p.id
+      JOIN enfermeros e ON sv.enfermero_id = e.id
+      ORDER BY sv.fecha_registro DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching signos vitales:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.post('/api/signos-vitales', requireAuth, async (req, res) => {
+  try {
+    const { 
+      paciente_id, presion_sistolica, presion_diastolica, 
+      saturacion_oxigeno, frecuencia_cardiaca, temperatura, observaciones 
+    } = req.body;
+    
+    const result = await pool.query(`
+      INSERT INTO signos_vitales (
+        paciente_id, enfermero_id, presion_sistolica, presion_diastolica,
+        saturacion_oxigeno, frecuencia_cardiaca, temperatura, observaciones
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *
+    `, [
+      paciente_id, req.session.enfermero_id, presion_sistolica, presion_diastolica,
+      saturacion_oxigeno, frecuencia_cardiaca, temperatura, observaciones
+    ]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating signos vitales:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.get('/api/pacientes/:id/signos-vitales', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(`
+      SELECT sv.*, e.nombre as enfermero_nombre, e.apellidos as enfermero_apellidos
+      FROM signos_vitales sv
+      JOIN enfermeros e ON sv.enfermero_id = e.id
+      WHERE sv.paciente_id = $1
+      ORDER BY sv.fecha_registro DESC
+    `, [id]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching signos vitales:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Doping tests endpoints
+app.get('/api/pruebas-doping', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT pd.*, 
+             p.nombre as paciente_nombre, p.apellidos as paciente_apellidos, p.numero_expediente,
+             e.nombre as enfermero_nombre, e.apellidos as enfermero_apellidos
+      FROM pruebas_doping pd
+      JOIN pacientes p ON pd.paciente_id = p.id
+      JOIN enfermeros e ON pd.enfermero_id = e.id
+      ORDER BY pd.fecha_prueba DESC, pd.hora_prueba DESC
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching pruebas doping:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.post('/api/pruebas-doping', requireAuth, async (req, res) => {
+  try {
+    const { 
+      paciente_id, fecha_prueba, hora_prueba, tipo_muestra, 
+      resultado, sustancias_detectadas, observaciones 
+    } = req.body;
+    
+    const result = await pool.query(`
+      INSERT INTO pruebas_doping (
+        paciente_id, enfermero_id, fecha_prueba, hora_prueba, tipo_muestra,
+        resultado, sustancias_detectadas, observaciones
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+      RETURNING *
+    `, [
+      paciente_id, req.session.enfermero_id, fecha_prueba, hora_prueba, tipo_muestra,
+      resultado, sustancias_detectadas, observaciones
+    ]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating prueba doping:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.get('/api/pacientes/:id/pruebas-doping', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query(`
+      SELECT pd.*, e.nombre as enfermero_nombre, e.apellidos as enfermero_apellidos
+      FROM pruebas_doping pd
+      JOIN enfermeros e ON pd.enfermero_id = e.id
+      WHERE pd.paciente_id = $1
+      ORDER BY pd.fecha_prueba DESC, pd.hora_prueba DESC
+    `, [id]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching pruebas doping:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 // Database reset endpoint (admin only)
 app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
   try {
@@ -711,6 +882,8 @@ app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
     
     // Delete data in order to respect foreign key constraints
     await pool.query('DELETE FROM citas_seguimiento');
+    await pool.query('DELETE FROM pruebas_doping');
+    await pool.query('DELETE FROM signos_vitales');
     await pool.query('DELETE FROM fotos_medicamentos');
     await pool.query('DELETE FROM fotos_pertenencias');
     await pool.query('DELETE FROM medicamentos_paciente');
@@ -720,6 +893,8 @@ app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
     
     // Reset sequences
     await pool.query('ALTER SEQUENCE citas_seguimiento_id_seq RESTART WITH 1');
+    await pool.query('ALTER SEQUENCE pruebas_doping_id_seq RESTART WITH 1');
+    await pool.query('ALTER SEQUENCE signos_vitales_id_seq RESTART WITH 1');
     await pool.query('ALTER SEQUENCE fotos_medicamentos_id_seq RESTART WITH 1');
     await pool.query('ALTER SEQUENCE fotos_pertenencias_id_seq RESTART WITH 1');
     await pool.query('ALTER SEQUENCE medicamentos_paciente_id_seq RESTART WITH 1');

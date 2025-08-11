@@ -29,6 +29,19 @@ function VerPaciente() {
     anotaciones: ''
   });
   const [currentDate, setCurrentDate] = useState(new Date());
+  
+  // Doping tests states
+  const [pruebasDoping, setPruebasDoping] = useState([]);
+  const [showDopingModal, setShowDopingModal] = useState(false);
+  const [dopingForm, setDopingForm] = useState({
+    fecha_prueba: '',
+    hora_prueba: '',
+    tipo_muestra: '',
+    resultado: '',
+    sustancias_detectadas: '',
+    observaciones: ''
+  });
+  
   const [error, setError] = useState('');
 
   useEffect(() => {
@@ -40,6 +53,7 @@ function VerPaciente() {
         // Fetch additional data
         fetchFotos();
         fetchCitas();
+        fetchPruebasDoping();
       } catch (error) {
         console.error('Error al cargar paciente:', error);
       } finally {
@@ -69,6 +83,38 @@ function VerPaciente() {
       setCitas(response.data);
     } catch (error) {
       console.error('Error al cargar citas:', error);
+    }
+  };
+
+  const fetchPruebasDoping = async () => {
+    try {
+      const response = await axios.get(`/api/pacientes/${id}/pruebas-doping`);
+      setPruebasDoping(response.data);
+    } catch (error) {
+      console.error('Error al cargar pruebas de doping:', error);
+    }
+  };
+
+  const savePruebaDoping = async () => {
+    try {
+      await axios.post(`/api/pruebas-doping`, {
+        ...dopingForm,
+        paciente_id: id
+      });
+      
+      setShowDopingModal(false);
+      setDopingForm({
+        fecha_prueba: '',
+        hora_prueba: '',
+        tipo_muestra: '',
+        resultado: '',
+        sustancias_detectadas: '',
+        observaciones: ''
+      });
+      fetchPruebasDoping();
+    } catch (error) {
+      console.error('Error al guardar prueba de doping:', error);
+      setError('Error al guardar la prueba de doping');
     }
   };
 
@@ -255,6 +301,9 @@ function VerPaciente() {
             <Nav.Link eventKey="medicamentos-fotos">💊 Medicamentos</Nav.Link>
           </Nav.Item>
           <Nav.Item>
+            <Nav.Link eventKey="doping">🧪 Pruebas Doping</Nav.Link>
+          </Nav.Item>
+          <Nav.Item>
             <Nav.Link eventKey="citas">📅 Citas</Nav.Link>
           </Nav.Item>
         </Nav>
@@ -273,6 +322,7 @@ function VerPaciente() {
                         <p><strong>Expediente:</strong> {paciente.numero_expediente}</p>
                         <p><strong>Nombre:</strong> {paciente.nombre} {paciente.apellidos}</p>
                         <p><strong>Fecha de Nacimiento:</strong> {paciente.fecha_nacimiento}</p>
+                        <p><strong>Sexo:</strong> {paciente.sexo || 'No especificado'}</p>
                         <p><strong>Documento:</strong> {paciente.documento_identidad}</p>
                         <p><strong>Nacionalidad:</strong> {paciente.nacionalidad}</p>
                       </Col>
@@ -284,6 +334,43 @@ function VerPaciente() {
                         <p><strong>Teléfono Principal:</strong> {paciente.telefono_principal}</p>
                         {paciente.cuarto_asignado && <p><strong>Cuarto:</strong> {paciente.cuarto_asignado}</p>}
                       </Col>
+                    </Row>
+
+                    {/* Addiction Treatment Information */}
+                    <hr />
+                    <h6 className="text-primary mb-3">Información del Tratamiento</h6>
+                    <Row>
+                      <Col md={6}>
+                        {paciente.fecha_ingreso && (
+                          <p><strong>Fecha/Hora Ingreso:</strong> {new Date(paciente.fecha_ingreso).toLocaleString('es-ES')}</p>
+                        )}
+                        {paciente.motivo_ingreso && (
+                          <p><strong>Motivo:</strong> <Badge bg="info">{paciente.motivo_ingreso}</Badge></p>
+                        )}
+                        {paciente.fase_tratamiento && (
+                          <p><strong>Fase:</strong> <Badge bg="warning">{paciente.fase_tratamiento}</Badge></p>
+                        )}
+                      </Col>
+                      <Col md={6}>
+                        {paciente.unidad_cama && <p><strong>Unidad/Cama:</strong> {paciente.unidad_cama}</p>}
+                        {paciente.medico_tratante && <p><strong>Médico Tratante:</strong> {paciente.medico_tratante}</p>}
+                        {paciente.equipo_tratante && <p><strong>Equipo Tratante:</strong> {paciente.equipo_tratante}</p>}
+                      </Col>
+                    </Row>
+
+                    {/* Risk Factors */}
+                    {(paciente.riesgo_suicidio || paciente.riesgo_violencia || paciente.riesgo_fuga || paciente.riesgo_caidas) && (
+                      <>
+                        <hr />
+                        <h6 className="text-warning mb-3">⚠️ Riesgos Identificados</h6>
+                        <div className="d-flex flex-wrap gap-2">
+                          {paciente.riesgo_suicidio && <Badge bg="danger">Suicidio/Autoagresión</Badge>}
+                          {paciente.riesgo_violencia && <Badge bg="danger">Violencia</Badge>}
+                          {paciente.riesgo_fuga && <Badge bg="warning">Fuga</Badge>}
+                          {paciente.riesgo_caidas && <Badge bg="secondary">Caídas</Badge>}
+                        </div>
+                      </>
+                    )}
                     </Row>
                     {paciente.contacto_emergencia_nombre && (
                       <div className="mt-3">
@@ -412,6 +499,65 @@ function VerPaciente() {
                 {fotosMedicamentos.length === 0 && (
                   <p className="text-muted text-center">No hay fotos de medicamentos registradas</p>
                 )}
+              </Card.Body>
+            </Card>
+          </Tab.Pane>
+
+          <Tab.Pane eventKey="doping">
+            <Card className="medical-card">
+              <Card.Header className="d-flex justify-content-between align-items-center flex-wrap">
+                <h5 className="mb-2 mb-md-0">Registro y Control de Pruebas de Doping</h5>
+                <Button variant="primary" size="sm" onClick={() => setShowDopingModal(true)}>
+                  ➕ Nueva Prueba
+                </Button>
+              </Card.Header>
+              <Card.Body>
+                <div className="table-responsive">
+                  <Table striped hover size="sm">
+                    <thead>
+                      <tr>
+                        <th>Fecha</th>
+                        <th>Hora</th>
+                        <th>Tipo Muestra</th>
+                        <th>Resultado</th>
+                        <th>Sustancias</th>
+                        <th>Enfermero</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {pruebasDoping.length === 0 ? (
+                        <tr>
+                          <td colSpan="6" className="text-center text-muted">
+                            No hay pruebas de doping registradas
+                          </td>
+                        </tr>
+                      ) : (
+                        pruebasDoping.map((prueba) => (
+                          <tr key={prueba.id}>
+                            <td>{prueba.fecha_prueba}</td>
+                            <td>{prueba.hora_prueba}</td>
+                            <td>
+                              <Badge bg={prueba.tipo_muestra === 'sangre' ? 'danger' : 'warning'}>
+                                {prueba.tipo_muestra}
+                              </Badge>
+                            </td>
+                            <td>
+                              <Badge bg={prueba.resultado === 'positivo' ? 'danger' : 'success'}>
+                                {prueba.resultado}
+                              </Badge>
+                            </td>
+                            <td>{prueba.sustancias_detectadas || '-'}</td>
+                            <td>
+                              <small>
+                                {prueba.enfermero_nombre} {prueba.enfermero_apellidos}
+                              </small>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </Table>
+                </div>
               </Card.Body>
             </Card>
           </Tab.Pane>
@@ -591,6 +737,103 @@ function VerPaciente() {
               {editingCita ? 'Actualizar' : 'Guardar'} Cita
             </Button>
           </div>
+        </Modal.Footer>
+      </Modal>
+
+      {/* Doping Test Modal */}
+      <Modal show={showDopingModal} onHide={() => setShowDopingModal(false)}>
+        <Modal.Header closeButton>
+          <Modal.Title>Nueva Prueba de Doping</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          <Form>
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Fecha de la Prueba</Form.Label>
+                  <Form.Control
+                    type="date"
+                    value={dopingForm.fecha_prueba}
+                    onChange={(e) => setDopingForm({...dopingForm, fecha_prueba: e.target.value})}
+                    required
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Hora de la Prueba</Form.Label>
+                  <Form.Control
+                    type="time"
+                    value={dopingForm.hora_prueba}
+                    onChange={(e) => setDopingForm({...dopingForm, hora_prueba: e.target.value})}
+                    required
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+            <Row>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Tipo de Muestra</Form.Label>
+                  <Form.Select
+                    value={dopingForm.tipo_muestra}
+                    onChange={(e) => setDopingForm({...dopingForm, tipo_muestra: e.target.value})}
+                    required
+                  >
+                    <option value="">Seleccionar...</option>
+                    <option value="sangre">Sangre</option>
+                    <option value="orina">Orina</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+              <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Resultado</Form.Label>
+                  <Form.Select
+                    value={dopingForm.resultado}
+                    onChange={(e) => setDopingForm({...dopingForm, resultado: e.target.value})}
+                    required
+                  >
+                    <option value="">Seleccionar...</option>
+                    <option value="positivo">Positivo</option>
+                    <option value="negativo">Negativo</option>
+                  </Form.Select>
+                </Form.Group>
+              </Col>
+            </Row>
+            <Form.Group className="mb-3">
+              <Form.Label>Sustancias Detectadas</Form.Label>
+              <Form.Control
+                type="text"
+                value={dopingForm.sustancias_detectadas}
+                onChange={(e) => setDopingForm({...dopingForm, sustancias_detectadas: e.target.value})}
+                placeholder="Cocaína, Marihuana, Alcohol, etc."
+              />
+              <small className="text-muted">Solo llenar si el resultado es positivo</small>
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>Observaciones</Form.Label>
+              <Form.Control
+                as="textarea"
+                rows={3}
+                value={dopingForm.observaciones}
+                onChange={(e) => setDopingForm({...dopingForm, observaciones: e.target.value})}
+                placeholder="Observaciones sobre la prueba..."
+              />
+            </Form.Group>
+          </Form>
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setShowDopingModal(false)}>
+            Cancelar
+          </Button>
+          <Button 
+            variant="primary" 
+            onClick={savePruebaDoping}
+            disabled={!dopingForm.fecha_prueba || !dopingForm.hora_prueba || !dopingForm.tipo_muestra || !dopingForm.resultado}
+          >
+            Guardar Prueba
+          </Button>
         </Modal.Footer>
       </Modal>
     </Container>
