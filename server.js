@@ -116,7 +116,8 @@ async function initDatabase() {
         nombre VARCHAR(100) NOT NULL,
         apellidos VARCHAR(100) NOT NULL,
         turno VARCHAR(20) NOT NULL,
-        activo BOOLEAN DEFAULT true
+        activo BOOLEAN DEFAULT true,
+        debe_cambiar_password BOOLEAN DEFAULT false
       )
     `);
 
@@ -234,8 +235,12 @@ async function initDatabase() {
       )
     `);
 
-    // Add sexo column to pacientes if it doesn't exist
+    // Add columns to existing tables if they don't exist
     try {
+      // Add debe_cambiar_password column to enfermeros
+      await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS debe_cambiar_password BOOLEAN DEFAULT false`);
+      
+      // Add patient columns
       await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS sexo VARCHAR(20)`);
       await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fecha_ingreso TIMESTAMP`);
       await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS motivo_ingreso VARCHAR(100)`);
@@ -283,24 +288,34 @@ async function initDatabase() {
       )
     `);
 
-    // Insert default users if they don't exist
-    const existingUsers = await pool.query('SELECT codigo FROM enfermeros WHERE codigo IN ($1, $2, $3, $4)', ['admin', 'erick', 'cintia', 'ENF001']);
+    // Insert/Update default users
+    const existingUsers = await pool.query('SELECT codigo, clave FROM enfermeros WHERE codigo IN ($1, $2, $3, $4)', ['admin', 'erick', 'cintia', 'ENF001']);
     const existingCodes = existingUsers.rows.map(row => row.codigo);
     
     const defaultUsers = [
-      { codigo: 'admin', clave: 'Admin1965!*', nombre: 'Admin', apellidos: 'Sistema', turno: 'todos' },
-      { codigo: 'erick', clave: 'Admin1965!*', nombre: 'Erick', apellidos: 'Usuario', turno: 'mañana' },
-      { codigo: 'cintia', clave: 'Admin1965!*', nombre: 'Cintia', apellidos: 'Usuario', turno: 'tarde' },
-      { codigo: 'ENF001', clave: '123456', nombre: 'Enfermero', apellidos: 'De Prueba', turno: 'mañana' }
+      { codigo: 'admin', clave: 'Admin1965!*', nombre: 'Admin', apellidos: 'Sistema', turno: 'todos', debe_cambiar_password: false },
+      { codigo: 'erick', clave: 'abc123', nombre: 'Erick', apellidos: 'Usuario', turno: 'mañana', debe_cambiar_password: true },
+      { codigo: 'cintia', clave: 'abc123', nombre: 'Cintia', apellidos: 'Usuario', turno: 'tarde', debe_cambiar_password: true },
+      { codigo: 'ENF001', clave: 'abc123', nombre: 'Enfermero', apellidos: 'De Prueba', turno: 'mañana', debe_cambiar_password: true }
     ];
 
     for (const user of defaultUsers) {
       if (!existingCodes.includes(user.codigo)) {
         await pool.query(`
-          INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno)
-          VALUES ($1, $2, $3, $4, $5)
-        `, [user.codigo, user.clave, user.nombre, user.apellidos, user.turno]);
+          INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno, debe_cambiar_password)
+          VALUES ($1, $2, $3, $4, $5, $6)
+        `, [user.codigo, user.clave, user.nombre, user.apellidos, user.turno, user.debe_cambiar_password]);
         console.log(`Created user: ${user.codigo}`);
+      } else {
+        // Update existing non-admin users with new password requirements
+        if (user.codigo !== 'admin') {
+          await pool.query(`
+            UPDATE enfermeros 
+            SET clave = $1, debe_cambiar_password = $2 
+            WHERE codigo = $3
+          `, [user.clave, user.debe_cambiar_password, user.codigo]);
+          console.log(`Updated password for user: ${user.codigo}`);
+        }
       }
     }
 
@@ -347,6 +362,23 @@ app.post('/api/login', async (req, res) => {
     
     if (result.rows.length > 0) {
       const enfermero = result.rows[0];
+      
+      // Check if user needs to change password
+      if (enfermero.debe_cambiar_password) {
+        return res.json({
+          success: true,
+          requiresPasswordChange: true,
+          enfermero: {
+            id: enfermero.id,
+            codigo: enfermero.codigo,
+            nombre: enfermero.nombre,
+            apellidos: enfermero.apellidos,
+            turno: enfermero.turno,
+            activo: enfermero.activo
+          }
+        });
+      }
+      
       req.session.enfermero_id = enfermero.id;
       res.json({
         success: true,
@@ -374,6 +406,42 @@ app.post('/api/login', async (req, res) => {
 app.post('/api/logout', (req, res) => {
   req.session.destroy();
   res.json({ success: true });
+});
+
+app.post('/api/change-password', async (req, res) => {
+  try {
+    const { codigo, claveActual, nuevaClave } = req.body;
+    
+    // Verify current password
+    const result = await pool.query(
+      'SELECT * FROM enfermeros WHERE codigo = $1 AND clave = $2 AND activo = true',
+      [codigo, claveActual]
+    );
+    
+    if (result.rows.length === 0) {
+      return res.status(401).json({
+        success: false,
+        message: 'Contraseña actual incorrecta'
+      });
+    }
+    
+    const enfermero = result.rows[0];
+    
+    // Update password and remove password change requirement
+    await pool.query(
+      'UPDATE enfermeros SET clave = $1, debe_cambiar_password = false WHERE id = $2',
+      [nuevaClave, enfermero.id]
+    );
+    
+    res.json({
+      success: true,
+      message: 'Contraseña cambiada correctamente. Por favor inicia sesión nuevamente.'
+    });
+    
+  } catch (error) {
+    console.error('Error changing password:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
 });
 
 app.get('/api/pacientes', requireAuth, async (req, res) => {

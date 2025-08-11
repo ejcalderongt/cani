@@ -1,11 +1,15 @@
 
 import React, { useState } from 'react';
 import axios from 'axios';
+import CambiarPassword from './CambiarPassword';
 
 function Login({ onLogin }) {
   const [formData, setFormData] = useState({ codigo: '', clave: '' });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
+  const [requiresPasswordChange, setRequiresPasswordChange] = useState(false);
+  const [tempEnfermero, setTempEnfermero] = useState(null);
+  const [successMessage, setSuccessMessage] = useState('');
 
   const handleChange = (e) => {
     setFormData({
@@ -35,7 +39,13 @@ function Login({ onLogin }) {
       const response = await axiosInstance.post('/api/login', formData);
       
       if (response.data.success) {
-        onLogin(response.data.enfermero);
+        if (response.data.requiresPasswordChange) {
+          setRequiresPasswordChange(true);
+          setTempEnfermero(response.data.enfermero);
+          setError('');
+        } else {
+          onLogin(response.data.enfermero);
+        }
       } else {
         setError(response.data.message || 'Error de autenticación');
       }
@@ -56,6 +66,30 @@ function Login({ onLogin }) {
     }
   };
 
+  const handlePasswordChanged = () => {
+    setRequiresPasswordChange(false);
+    setTempEnfermero(null);
+    setFormData({ codigo: '', clave: '' });
+    setSuccessMessage('Contraseña cambiada correctamente. Por favor inicia sesión nuevamente.');
+    setTimeout(() => setSuccessMessage(''), 5000);
+  };
+
+  const handlePasswordChangeCancel = () => {
+    setRequiresPasswordChange(false);
+    setTempEnfermero(null);
+    setFormData({ codigo: '', clave: '' });
+  };
+
+  if (requiresPasswordChange && tempEnfermero) {
+    return (
+      <CambiarPassword 
+        enfermero={tempEnfermero}
+        onPasswordChanged={handlePasswordChanged}
+        onCancel={handlePasswordChangeCancel}
+      />
+    );
+  }
+
   return (
     <div className="login-container">
       <div className="medical-card login-card">
@@ -67,6 +101,12 @@ function Login({ onLogin }) {
         {error && (
           <div className="alert alert-danger" role="alert">
             <strong>Error:</strong> {error}
+          </div>
+        )}
+
+        {successMessage && (
+          <div className="alert alert-success" role="alert">
+            <strong>Éxito:</strong> {successMessage}
           </div>
         )}
 
@@ -128,8 +168,18 @@ function Login({ onLogin }) {
 
         <div style={{ marginTop: 'var(--space-6)', padding: 'var(--space-4)', background: 'rgba(15, 118, 110, 0.05)', borderRadius: 'var(--radius)', fontSize: 'var(--text-sm)', color: 'var(--muted)' }}>
           <strong>Credenciales de prueba:</strong><br />
-          Usuario: <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>admin</code><br />
-          Contraseña: <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>Admin1965!*</code>
+          <div style={{ marginBottom: 'var(--space-2)' }}>
+            <strong>Admin:</strong> <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>admin</code> / 
+            <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px', marginLeft: '4px' }}>Admin1965!*</code>
+          </div>
+          <div>
+            <strong>Usuarios:</strong> <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px' }}>erick</code>, 
+            <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px', marginLeft: '4px' }}>cintia</code>, 
+            <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px', marginLeft: '4px' }}>ENF001</code> / 
+            <code style={{ background: 'var(--bg-elev)', padding: '2px 6px', borderRadius: '4px', marginLeft: '4px' }}>abc123</code>
+            <br />
+            <em style={{ fontSize: '0.8em', opacity: 0.8 }}>Estos usuarios deben cambiar su contraseña al iniciar sesión</em>
+          </div>
         </div>
       </div>
     </div>

@@ -16,7 +16,8 @@ function MantenimientoUsuarios() {
     nombre: '',
     apellidos: '',
     turno: 'mañana',
-    activo: true
+    activo: true,
+    debe_cambiar_password: false
   });
 
   useEffect(() => {
@@ -65,7 +66,8 @@ function MantenimientoUsuarios() {
         nombre: '',
         apellidos: '',
         turno: 'mañana',
-        activo: true
+        activo: true,
+        debe_cambiar_password: false
       });
       fetchUsuarios();
     } catch (error) {
@@ -81,7 +83,8 @@ function MantenimientoUsuarios() {
       nombre: usuario.nombre,
       apellidos: usuario.apellidos,
       turno: usuario.turno,
-      activo: usuario.activo
+      activo: usuario.activo,
+      debe_cambiar_password: usuario.debe_cambiar_password || false
     });
     setShowModal(true);
   };
@@ -111,7 +114,8 @@ function MantenimientoUsuarios() {
       nombre: '',
       apellidos: '',
       turno: 'mañana',
-      activo: true
+      activo: true,
+      debe_cambiar_password: true
     });
     setShowModal(true);
   };
@@ -150,6 +154,7 @@ function MantenimientoUsuarios() {
                 <th>Apellidos</th>
                 <th>Turno</th>
                 <th>Estado</th>
+                <th>Cambio Requerido</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -163,6 +168,11 @@ function MantenimientoUsuarios() {
                   <td>
                     <span className={`badge bg-${usuario.activo ? 'success' : 'secondary'}`}>
                       {usuario.activo ? 'Activo' : 'Inactivo'}
+                    </span>
+                  </td>
+                  <td>
+                    <span className={`badge bg-${usuario.debe_cambiar_password ? 'warning' : 'success'}`}>
+                      {usuario.debe_cambiar_password ? 'Sí' : 'No'}
                     </span>
                   </td>
                   <td>
@@ -277,14 +287,42 @@ function MantenimientoUsuarios() {
             </Form.Group>
 
             {editingUser && (
+              <div className="row">
+                <div className="col-md-6">
+                  <Form.Group className="mb-3">
+                    <Form.Check
+                      type="checkbox"
+                      name="activo"
+                      checked={formData.activo}
+                      onChange={handleChange}
+                      label="Usuario activo"
+                      disabled={editingUser?.codigo === 'admin'}
+                    />
+                  </Form.Group>
+                </div>
+                <div className="col-md-6">
+                  <Form.Group className="mb-3">
+                    <Form.Check
+                      type="checkbox"
+                      name="debe_cambiar_password"
+                      checked={formData.debe_cambiar_password}
+                      onChange={handleChange}
+                      label="Debe cambiar contraseña"
+                      disabled={editingUser?.codigo === 'admin'}
+                    />
+                  </Form.Group>
+                </div>
+              </div>
+            )}
+            
+            {!editingUser && (
               <Form.Group className="mb-3">
                 <Form.Check
                   type="checkbox"
-                  name="activo"
-                  checked={formData.activo}
+                  name="debe_cambiar_password"
+                  checked={formData.debe_cambiar_password}
                   onChange={handleChange}
-                  label="Usuario activo"
-                  disabled={editingUser?.codigo === 'admin'}
+                  label="Debe cambiar contraseña al iniciar sesión"
                 />
               </Form.Group>
             )}
