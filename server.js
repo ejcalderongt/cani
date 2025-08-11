@@ -17,8 +17,38 @@ const pool = new Pool({
 
 // Middleware
 app.use(cors({
-  origin: process.env.NODE_ENV === 'production' ? process.env.FRONTEND_URL : ['http://localhost:3000', 'http://localhost:3001'],
-  credentials: true
+  origin: function (origin, callback) {
+    // Allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    
+    // Allow all Replit domains and localhost for development
+    const allowedOrigins = [
+      'http://localhost:3000',
+      'http://localhost:3001',
+      /https:\/\/.*\.replit\.dev$/,
+      /https:\/\/.*\.repl\.co$/
+    ];
+    
+    // Check if origin matches any allowed pattern
+    const isAllowed = allowedOrigins.some(pattern => {
+      if (typeof pattern === 'string') {
+        return pattern === origin;
+      } else {
+        return pattern.test(origin);
+      }
+    });
+    
+    if (isAllowed) {
+      callback(null, true);
+    } else {
+      console.log('CORS blocked origin:', origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200
 }));
 
 app.use(express.json());

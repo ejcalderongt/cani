@@ -18,11 +18,18 @@ const getBaseURL = () => {
   if (process.env.NODE_ENV === 'production') {
     return '';
   }
-  // In Replit environment, check if we're running on replit.dev domain
+  
+  // In Replit environment, try different port configurations
   if (window.location.hostname.includes('replit.dev')) {
-    // Use port 3002 which is mapped to internal port 5001 in .replit
-    return `${window.location.protocol}//${window.location.hostname}:3002`;
+    // For Replit, we need to figure out the correct port mapping
+    // Let's try the same domain but different ports
+    const hostname = window.location.hostname;
+    const protocol = window.location.protocol;
+    
+    // First try port 3002 (as configured in .replit)
+    return `${protocol}//${hostname}:3002`;
   }
+  
   // Fallback for local development
   return 'http://localhost:5001';
 };
