@@ -196,6 +196,44 @@ async function initDatabase() {
       )
     `);
 
+    // Create fotos_pertenencias table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS fotos_pertenencias (
+        id SERIAL PRIMARY KEY,
+        paciente_id INTEGER REFERENCES pacientes(id),
+        nombre_archivo VARCHAR(255) NOT NULL,
+        descripcion TEXT,
+        datos_imagen TEXT NOT NULL,
+        fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create fotos_medicamentos table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS fotos_medicamentos (
+        id SERIAL PRIMARY KEY,
+        paciente_id INTEGER REFERENCES pacientes(id),
+        nombre_archivo VARCHAR(255) NOT NULL,
+        descripcion TEXT,
+        datos_imagen TEXT NOT NULL,
+        fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create citas_seguimiento table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS citas_seguimiento (
+        id SERIAL PRIMARY KEY,
+        paciente_id INTEGER REFERENCES pacientes(id),
+        nombre_doctor VARCHAR(100) NOT NULL,
+        fecha_cita DATE NOT NULL,
+        hora_cita TIME NOT NULL,
+        anotaciones TEXT,
+        estado VARCHAR(20) DEFAULT 'programada',
+        fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
     // Insert default users if they don't exist
     const existingUsers = await pool.query('SELECT codigo FROM enfermeros WHERE codigo IN ($1, $2, $3, $4)', ['admin', 'erick', 'cintia', 'ENF001']);
     const existingCodes = existingUsers.rows.map(row => row.codigo);
@@ -536,6 +574,135 @@ app.delete('/api/admin/usuarios/:id', requireAdmin, async (req, res) => {
   }
 });
 
+// Photos endpoints
+app.get('/api/pacientes/:id/fotos-pertenencias', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('SELECT * FROM fotos_pertenencias WHERE paciente_id = $1 ORDER BY fecha_registro DESC', [id]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching fotos pertenencias:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.post('/api/pacientes/:id/fotos-pertenencias', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre_archivo, descripcion, datos_imagen } = req.body;
+    
+    const result = await pool.query(`
+      INSERT INTO fotos_pertenencias (paciente_id, nombre_archivo, descripcion, datos_imagen)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `, [id, nombre_archivo, descripcion, datos_imagen]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error saving foto pertenencia:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.get('/api/pacientes/:id/fotos-medicamentos', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('SELECT * FROM fotos_medicamentos WHERE paciente_id = $1 ORDER BY fecha_registro DESC', [id]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching fotos medicamentos:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.post('/api/pacientes/:id/fotos-medicamentos', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre_archivo, descripcion, datos_imagen } = req.body;
+    
+    const result = await pool.query(`
+      INSERT INTO fotos_medicamentos (paciente_id, nombre_archivo, descripcion, datos_imagen)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *
+    `, [id, nombre_archivo, descripcion, datos_imagen]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error saving foto medicamento:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Appointments endpoints
+app.get('/api/pacientes/:id/citas', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('SELECT * FROM citas_seguimiento WHERE paciente_id = $1 ORDER BY fecha_cita, hora_cita', [id]);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching citas:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.post('/api/pacientes/:id/citas', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre_doctor, fecha_cita, hora_cita, anotaciones } = req.body;
+    
+    const result = await pool.query(`
+      INSERT INTO citas_seguimiento (paciente_id, nombre_doctor, fecha_cita, hora_cita, anotaciones)
+      VALUES ($1, $2, $3, $4, $5)
+      RETURNING *
+    `, [id, nombre_doctor, fecha_cita, hora_cita, anotaciones]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating cita:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.put('/api/citas/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre_doctor, fecha_cita, hora_cita, anotaciones, estado } = req.body;
+    
+    const result = await pool.query(`
+      UPDATE citas_seguimiento 
+      SET nombre_doctor = $1, fecha_cita = $2, hora_cita = $3, anotaciones = $4, estado = $5
+      WHERE id = $6
+      RETURNING *
+    `, [nombre_doctor, fecha_cita, hora_cita, anotaciones, estado, id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Cita no encontrada' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating cita:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.delete('/api/citas/:id', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    
+    const result = await pool.query('DELETE FROM citas_seguimiento WHERE id = $1 RETURNING *', [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Cita no encontrada' });
+    }
+
+    res.json({ message: 'Cita eliminada correctamente' });
+  } catch (error) {
+    console.error('Error deleting cita:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 // Database reset endpoint (admin only)
 app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
   try {
@@ -543,12 +710,18 @@ app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
     await pool.query('BEGIN');
     
     // Delete data in order to respect foreign key constraints
+    await pool.query('DELETE FROM citas_seguimiento');
+    await pool.query('DELETE FROM fotos_medicamentos');
+    await pool.query('DELETE FROM fotos_pertenencias');
     await pool.query('DELETE FROM medicamentos_paciente');
     await pool.query('DELETE FROM notas_enfermeria');
     await pool.query('DELETE FROM pacientes');
     await pool.query('DELETE FROM medicamentos');
     
     // Reset sequences
+    await pool.query('ALTER SEQUENCE citas_seguimiento_id_seq RESTART WITH 1');
+    await pool.query('ALTER SEQUENCE fotos_medicamentos_id_seq RESTART WITH 1');
+    await pool.query('ALTER SEQUENCE fotos_pertenencias_id_seq RESTART WITH 1');
     await pool.query('ALTER SEQUENCE medicamentos_paciente_id_seq RESTART WITH 1');
     await pool.query('ALTER SEQUENCE notas_enfermeria_id_seq RESTART WITH 1');
     await pool.query('ALTER SEQUENCE pacientes_id_seq RESTART WITH 1');
