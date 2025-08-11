@@ -129,7 +129,14 @@ function Dashboard() {
             }}>
               {stat.value}
             </h3>
-            <p className="text-muted text-sm">{stat.title}</p>
+            <p style={{ 
+              fontSize: 'var(--text-sm)', 
+              color: 'var(--text)',
+              fontWeight: '500',
+              margin: 0
+            }}>
+              {stat.title}
+            </p>
           </div>
         ))}
       </div>
@@ -192,7 +199,11 @@ function Dashboard() {
                   }}>
                     {action.title}
                   </h4>
-                  <p className="text-muted text-sm" style={{ margin: 0 }}>
+                  <p style={{ 
+                    color: 'var(--muted)', 
+                    fontSize: 'var(--text-sm)',
+                    margin: 0 
+                  }}>
                     {action.description}
                   </p>
                 </div>

@@ -50,6 +50,12 @@
     --muted: #94A3B8;
     --border: #334155;
   }
+  
+  /* Ensure better text contrast in dark mode */
+  .text-muted {
+    color: #CBD5E1 !important;
+    opacity: 0.9;
+  }
 }
 
 /* Reset and base styles */
@@ -442,17 +448,44 @@ p, span, div, li, td, th {
   color: var(--text);
 }
 
+/* Ensure strong contrast for text elements */
 .text-primary { color: var(--primary); }
 .text-secondary { color: var(--secondary); }
 .text-success { color: var(--success); }
 .text-warning { color: var(--warning); }
 .text-error { color: var(--error); }
 
+/* Better contrast for muted text */
+.text-muted { 
+  color: var(--muted);
+  font-weight: 400;
+}
+
 /* Ensure descriptions and helper text are visible */
 .description,
 .helper-text,
 .form-help {
   color: var(--muted) !important;
+  font-weight: 400;
+}
+
+/* Medical card specific text improvements */
+.medical-card h1,
+.medical-card h2,
+.medical-card h3,
+.medical-card h4,
+.medical-card h5,
+.medical-card h6 {
+  color: var(--text) !important;
+}
+
+.medical-card p:not(.text-muted) {
+  color: var(--text) !important;
+}
+
+.medical-card .text-muted {
+  color: var(--muted) !important;
+  opacity: 0.8;
 }
 
 /* Focus management for accessibility */
