@@ -998,7 +998,7 @@ app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
 });
 
 // Health check endpoint for deployments
-app.get('/', (req, res) => {
+app.get('/api/health', (req, res) => {
   res.status(200).json({ 
     status: 'OK', 
     message: 'Hospital Management System API is running',
@@ -1013,10 +1013,11 @@ app.get('*', (req, res) => {
     return res.status(404).json({ error: 'API endpoint not found' });
   }
   
-  if (process.env.NODE_ENV === 'production') {
+  // Always serve React build files when they exist
+  try {
     res.sendFile(path.join(__dirname, 'build', 'index.html'));
-  } else {
-    res.json({ message: 'API server running. Please access the React app on port 3001.' });
+  } catch (error) {
+    res.json({ message: 'Hospital Management System - Please ensure the React app is built.' });
   }
 });
 
@@ -1024,5 +1025,7 @@ app.get('*', (req, res) => {
 initDatabase().then(() => {
   app.listen(port, '0.0.0.0', () => {
     console.log(`Server running on http://0.0.0.0:${port}`);
+    console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
+    console.log(`Database URL configured: ${!!process.env.DATABASE_URL}`);
   });
 });
