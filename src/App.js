@@ -14,7 +14,16 @@ import Medicamentos from './components/Medicamentos';
 import NuevoMedicamento from './components/NuevoMedicamento';
 
 // Configure axios defaults
-axios.defaults.baseURL = process.env.NODE_ENV === 'production' ? '' : 'http://localhost:5001';
+const getBaseURL = () => {
+  if (process.env.NODE_ENV === 'production') {
+    return '';
+  }
+  // In development, use the current host but port 5001
+  const hostname = window.location.hostname;
+  return `https://${hostname}:5001`;
+};
+
+axios.defaults.baseURL = getBaseURL();
 axios.defaults.withCredentials = true;
 
 function App() {

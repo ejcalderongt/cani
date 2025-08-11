@@ -136,13 +136,25 @@ async function initDatabase() {
       )
     `);
 
-    // Insert test nurse if doesn't exist
-    const nurse = await pool.query('SELECT * FROM enfermeros LIMIT 1');
-    if (nurse.rows.length === 0) {
-      await pool.query(`
-        INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno)
-        VALUES ('ENF001', '123456', 'Enfermero', 'De Prueba', 'mañana')
-      `);
+    // Insert default users if they don't exist
+    const existingUsers = await pool.query('SELECT codigo FROM enfermeros WHERE codigo IN ($1, $2, $3, $4)', ['admin', 'erick', 'cintia', 'ENF001']);
+    const existingCodes = existingUsers.rows.map(row => row.codigo);
+    
+    const defaultUsers = [
+      { codigo: 'admin', clave: 'Admin1965!*', nombre: 'Admin', apellidos: 'Sistema', turno: 'todos' },
+      { codigo: 'erick', clave: 'Admin1965!*', nombre: 'Erick', apellidos: 'Usuario', turno: 'mañana' },
+      { codigo: 'cintia', clave: 'Admin1965!*', nombre: 'Cintia', apellidos: 'Usuario', turno: 'tarde' },
+      { codigo: 'ENF001', clave: '123456', nombre: 'Enfermero', apellidos: 'De Prueba', turno: 'mañana' }
+    ];
+
+    for (const user of defaultUsers) {
+      if (!existingCodes.includes(user.codigo)) {
+        await pool.query(`
+          INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno)
+          VALUES ($1, $2, $3, $4, $5)
+        `, [user.codigo, user.clave, user.nombre, user.apellidos, user.turno]);
+        console.log(`Created user: ${user.codigo}`);
+      }
     }
 
     console.log('Database initialized successfully');
