@@ -43,8 +43,10 @@ function Login({ onLogin }) {
           setUserForPasswordChange(response.data.enfermero);
           setShowPasswordChange(true);
         } else {
-          // Normal login flow
-          onLogin(response.data.enfermero);
+          // Wait a moment for session to be established before redirecting
+          setTimeout(() => {
+            onLogin(response.data.enfermero);
+          }, 250);
         }
       } else {
         setError(response.data.message || 'Error de autenticación');
@@ -88,7 +90,7 @@ function Login({ onLogin }) {
 
   if (showPasswordChange && userForPasswordChange) {
     return (
-      <CambiarClave 
+      <CambiarClave
         enfermero={userForPasswordChange}
         onPasswordChanged={handlePasswordChanged}
         onCancel={handlePasswordChangeCancel}
@@ -172,7 +174,7 @@ function Login({ onLogin }) {
           </button>
         </form>
 
-        
+
       </div>
     </div>
   );

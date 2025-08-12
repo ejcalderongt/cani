@@ -44,38 +44,28 @@ function Dashboard() {
   useEffect(() => {
     const fetchDashboardData = async () => {
       try {
-        // Fetch real data from APIs
-        const [pacientesResponse, notasResponse, signosResponse] = await Promise.allSettled([
-          axios.get('/api/pacientes'),
-          axios.get('/api/notas'), 
-          axios.get('/api/signos-vitales')
-        ]);
+        console.log('Fetching dashboard data...');
         
-        // Handle responses, using empty arrays if requests failed
-        const pacientes = (pacientesResponse.status === 'fulfilled' && pacientesResponse.value?.data) ? pacientesResponse.value.data : [];
-        const notas = (notasResponse.status === 'fulfilled' && notasResponse.value?.data) ? notasResponse.value.data : [];
-        const signos = (signosResponse.status === 'fulfilled' && signosResponse.value?.data) ? signosResponse.value.data : [];
+        // First check if user is authenticated
+        const authCheck = await axios.get('/api/status');
+        console.log('Auth check result:', authCheck.data);
         
-        // Log the actual responses for debugging
-        console.log('Dashboard API responses:', {
-          pacientes: {
-            status: pacientesResponse.status,
-            reason: pacientesResponse.status === 'rejected' ? pacientesResponse.reason?.message : 'success',
-            data: pacientes.length
-          },
-          notas: {
-            status: notasResponse.status,
-            reason: notasResponse.status === 'rejected' ? notasResponse.reason?.message : 'success',
-            data: notas.length
-          },
-          signos: {
-            status: signosResponse.status,
-            reason: signosResponse.status === 'rejected' ? signosResponse.reason?.message : 'success',
-            data: signos.length
-          }
-        });
+        if (!authCheck.data.session?.enfermero_id) {
+          console.log('User not authenticated, redirecting to login');
+          navigate('/login');
+          return;
+        }
         
-        console.log('Dashboard data loaded:', {
+        // Fetch real data from APIs sequentially to avoid overwhelming server
+        const pacientesResponse = await axios.get('/api/pacientes');
+        const notasResponse = await axios.get('/api/notas'); 
+        const signosResponse = await axios.get('/api/signos-vitales');
+        
+        const pacientes = pacientesResponse.data || [];
+        const notas = notasResponse.data || [];
+        const signos = signosResponse.data || [];
+        
+        console.log('Dashboard data fetched:', {
           pacientes: pacientes.length,
           notas: notas.length,
           signos: signos.length
@@ -83,8 +73,6 @@ function Dashboard() {
         
         // Count active patients (patients without discharge date)
         const pacientesActivos = pacientes.filter(p => !p.fecha_salida && p.activo !== false).length;
-        const pacientesInternos = pacientes.filter(p => p.tipo_paciente === 'interno' && !p.fecha_salida && p.activo !== false).length;
-        const pacientesExternos = pacientes.filter(p => p.tipo_paciente === 'externo' && !p.fecha_salida && p.activo !== false).length;
         
         // Count notes from today
         const today = new Date().toISOString().split('T')[0];
@@ -103,7 +91,7 @@ function Dashboard() {
           {
             title: 'Pacientes Activos',
             value: pacientesActivos.toString(),
-            trend: `${pacientesActivos > 0 ? '+' : ''}${pacientesActivos}`,
+            trend: `${pacientesActivos}`,
             icon: '👥',
             color: 'var(--primary)',
             bgColor: 'rgba(15, 118, 110, 0.1)'
@@ -111,7 +99,7 @@ function Dashboard() {
           {
             title: 'Pacientes de Riesgo',
             value: casosCriticos.toString(),
-            trend: `${casosCriticos > 0 ? '+' : ''}${casosCriticos}`,
+            trend: `${casosCriticos}`,
             icon: '🚨',
             color: 'var(--error)',
             bgColor: 'rgba(239, 68, 68, 0.1)'
@@ -119,7 +107,7 @@ function Dashboard() {
           {
             title: 'Pacientes Hospitalizados',
             value: pendientesAlta.toString(),
-            trend: `${pendientesAlta > 0 ? '+' : ''}${pendientesAlta}`,
+            trend: `${pendientesAlta}`,
             icon: '🏥',
             color: 'var(--warning)',
             bgColor: 'rgba(245, 158, 11, 0.1)'
@@ -127,7 +115,7 @@ function Dashboard() {
           {
             title: 'Notas de Enfermería Hoy',
             value: notasHoy.toString(),
-            trend: `${notasHoy > 0 ? '+' : ''}${notasHoy}`,
+            trend: `${notasHoy}`,
             icon: '📝',
             color: 'var(--success)',
             bgColor: 'rgba(16, 185, 129, 0.1)'
@@ -143,7 +131,7 @@ function Dashboard() {
           return;
         }
         
-        // Set all values to 0 when there's an error
+        // Set all values to 0 when there's an error or no data
         setStats([
           {
             title: 'Pacientes Activos',
@@ -183,7 +171,12 @@ function Dashboard() {
       }
     };
 
-    fetchDashboardData();
+    // Add a small delay to ensure session is established after login
+    const timeoutId = setTimeout(() => {
+      fetchDashboardData();
+    }, 500);
+
+    return () => clearTimeout(timeoutId);
   }, []);
 
   const quickActions = [
