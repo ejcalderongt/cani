@@ -52,22 +52,22 @@ function Dashboard() {
         const notas = notasResponse.data;
         const signos = signosResponse.data;
         
-        // Count patients by type
-        const pacientesActivos = pacientes.length;
-        const pacientesInternos = pacientes.filter(p => p.tipo_paciente === 'interno').length;
-        const pacientesExternos = pacientes.filter(p => p.tipo_paciente === 'externo').length;
+        // Count active patients (patients without discharge date)
+        const pacientesActivos = pacientes.filter(p => !p.fecha_salida && p.activo).length;
+        const pacientesInternos = pacientes.filter(p => p.tipo_paciente === 'interno' && !p.fecha_salida && p.activo).length;
+        const pacientesExternos = pacientes.filter(p => p.tipo_paciente === 'externo' && !p.fecha_salida && p.activo).length;
         
         // Count notes from today
         const today = new Date().toISOString().split('T')[0];
         const notasHoy = notas.filter(n => n.fecha === today).length;
         
-        // Count critical patients (example: patients with risk factors)
+        // Count critical patients (patients with any risk factor and still active)
         const casosCriticos = pacientes.filter(p => 
-          p.riesgo_suicidio || p.riesgo_violencia || p.riesgo_fuga || p.riesgo_caidas
+          !p.fecha_salida && (p.riesgo_suicidio || p.riesgo_violencia || p.riesgo_fuga || p.riesgo_caidas)
         ).length;
         
-        // Count patients pending discharge (patients without discharge date)
-        const pendientesAlta = pacientes.filter(p => !p.fecha_salida).length;
+        // Count patients pending discharge (active patients without discharge date)
+        const pendientesAlta = pacientes.filter(p => !p.fecha_salida && p.activo).length;
         
         // Update stats with real data
         setStats([
@@ -80,7 +80,7 @@ function Dashboard() {
             bgColor: 'rgba(15, 118, 110, 0.1)'
           },
           {
-            title: 'Casos Críticos',
+            title: 'Pacientes de Riesgo',
             value: casosCriticos.toString(),
             trend: `${casosCriticos > 0 ? '+' : ''}${casosCriticos}`,
             icon: '🚨',
@@ -88,10 +88,10 @@ function Dashboard() {
             bgColor: 'rgba(239, 68, 68, 0.1)'
           },
           {
-            title: 'Pendientes de Alta',
+            title: 'Pacientes Hospitalizados',
             value: pendientesAlta.toString(),
             trend: `${pendientesAlta > 0 ? '+' : ''}${pendientesAlta}`,
-            icon: '📋',
+            icon: '🏥',
             color: 'var(--warning)',
             bgColor: 'rgba(245, 158, 11, 0.1)'
           },

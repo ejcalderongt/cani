@@ -960,6 +960,30 @@ app.get('/api/pacientes/:id/pruebas-doping', requireAuth, async (req, res) => {
   }
 });
 
+// Patient discharge endpoint
+app.put('/api/pacientes/:id/alta', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { fecha_salida, observaciones_alta, medico_autoriza, enfermero_autoriza, director_autoriza } = req.body;
+
+    const result = await pool.query(`
+      UPDATE pacientes 
+      SET fecha_salida = $1, observaciones_alta = $2, medico_autoriza = $3, enfermero_autoriza = $4, director_autoriza = $5
+      WHERE id = $6
+      RETURNING *
+    `, [fecha_salida, observaciones_alta, medico_autoriza, enfermero_autoriza, director_autoriza, id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Paciente no encontrado' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating patient discharge:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 // Database reset endpoint (admin only)
 app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
   try {
