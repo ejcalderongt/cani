@@ -4,93 +4,65 @@ import axios from 'axios';
 
 function Dashboard() {
   const navigate = useNavigate();
-  const [stats, setStats] = useState([
-    {
-      title: 'Pacientes Activos',
-      value: '0',
-      trend: '0',
-      icon: '👥',
-      color: 'var(--primary)',
-      bgColor: 'rgba(15, 118, 110, 0.1)'
-    },
-    {
-      title: 'Casos Críticos',
-      value: '0',
-      trend: '0',
-      icon: '🚨',
-      color: 'var(--error)',
-      bgColor: 'rgba(239, 68, 68, 0.1)'
-    },
-    {
-      title: 'Pendientes de Alta',
-      value: '0',
-      trend: '0',
-      icon: '📋',
-      color: 'var(--warning)',
-      bgColor: 'rgba(245, 158, 11, 0.1)'
-    },
-    {
-      title: 'Notas de Enfermería Hoy',
-      value: '0',
-      trend: '0',
-      icon: '📝',
-      color: 'var(--success)',
-      bgColor: 'rgba(16, 185, 129, 0.1)'
-    }
-  ]);
+  const [stats, setStats] = useState(null);
   
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
+      setLoading(true);
+      
       try {
         console.log('Fetching dashboard data...');
         
-        // Try to fetch data - if any request fails, show zeros
+        // First check if user is authenticated
+        const statusResponse = await axios.get('/api/status');
+        if (!statusResponse.data.session?.enfermero_id) {
+          console.log('User not authenticated, redirecting to login');
+          navigate('/login');
+          return;
+        }
+        
+        // Fetch data from API endpoints
         const [pacientesResponse, notasResponse] = await Promise.allSettled([
           axios.get('/api/pacientes'),
           axios.get('/api/notas')
         ]);
         
-        // Check if requests were successful
+        // Handle responses - if failed, use empty arrays
         const pacientes = pacientesResponse.status === 'fulfilled' ? (pacientesResponse.value.data || []) : [];
         const notas = notasResponse.status === 'fulfilled' ? (notasResponse.value.data || []) : [];
         
         console.log('Dashboard data fetched:', {
           pacientes: pacientes.length,
           notas: notas.length,
-          pacientesRequestStatus: pacientesResponse.status,
-          notasRequestStatus: notasResponse.status
+          pacientesSuccess: pacientesResponse.status === 'fulfilled',
+          notasSuccess: notasResponse.status === 'fulfilled'
         });
         
-        // If any request failed, redirect to login
-        if (pacientesResponse.status === 'rejected' && pacientesResponse.reason?.response?.status === 401) {
-          console.log('User not authenticated, redirecting to login');
-          navigate('/login');
-          return;
-        }
+        // Calculate real statistics from database
+        const pacientesActivos = Array.isArray(pacientes) ? 
+          pacientes.filter(p => !p.fecha_salida && p.activo !== false).length : 0;
         
-        // Count active patients (patients without discharge date)
-        const pacientesActivos = pacientes.filter(p => !p.fecha_salida && p.activo !== false).length;
-        
-        // Count notes from today
         const today = new Date().toISOString().split('T')[0];
-        const notasHoy = notas.filter(n => n.fecha === today).length;
+        const notasHoy = Array.isArray(notas) ? 
+          notas.filter(n => n.fecha && n.fecha.startsWith(today)).length : 0;
         
-        // Count critical patients (patients with any risk factor and still active)
-        const casosCriticos = pacientes.filter(p => 
-          !p.fecha_salida && p.activo !== false && (p.riesgo_suicidio || p.riesgo_violencia || p.riesgo_fuga || p.riesgo_caidas)
-        ).length;
+        const casosCriticos = Array.isArray(pacientes) ? 
+          pacientes.filter(p => 
+            !p.fecha_salida && 
+            p.activo !== false && 
+            (p.riesgo_suicidio || p.riesgo_violencia || p.riesgo_fuga || p.riesgo_caidas)
+          ).length : 0;
         
-        // Count patients pending discharge (active patients without discharge date)
-        const pendientesAlta = pacientes.filter(p => !p.fecha_salida && p.activo !== false).length;
+        const pendientesAlta = pacientesActivos; // Same as active patients
         
-        // Always update stats with actual counts (including 0 if no data)
+        // Set the calculated statistics
         setStats([
           {
             title: 'Pacientes Activos',
             value: pacientesActivos.toString(),
-            trend: `${pacientesActivos}`,
+            trend: `Total: ${pacientesActivos}`,
             icon: '👥',
             color: 'var(--primary)',
             bgColor: 'rgba(15, 118, 110, 0.1)'
@@ -98,7 +70,7 @@ function Dashboard() {
           {
             title: 'Pacientes de Riesgo',
             value: casosCriticos.toString(),
-            trend: `${casosCriticos}`,
+            trend: `Críticos: ${casosCriticos}`,
             icon: '🚨',
             color: 'var(--error)',
             bgColor: 'rgba(239, 68, 68, 0.1)'
@@ -106,7 +78,7 @@ function Dashboard() {
           {
             title: 'Pacientes Hospitalizados',
             value: pendientesAlta.toString(),
-            trend: `${pendientesAlta}`,
+            trend: `Hospitalizados: ${pendientesAlta}`,
             icon: '🏥',
             color: 'var(--warning)',
             bgColor: 'rgba(245, 158, 11, 0.1)'
@@ -114,7 +86,7 @@ function Dashboard() {
           {
             title: 'Notas de Enfermería Hoy',
             value: notasHoy.toString(),
-            trend: `${notasHoy}`,
+            trend: `Hoy: ${notasHoy}`,
             icon: '📝',
             color: 'var(--success)',
             bgColor: 'rgba(16, 185, 129, 0.1)'
@@ -124,19 +96,19 @@ function Dashboard() {
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
         
-        // Check if the error is due to authentication
+        // If authentication error, redirect to login
         if (error.response?.status === 401) {
-          console.log('User not authenticated, redirecting to login');
+          console.log('Authentication error, redirecting to login');
           navigate('/login');
           return;
         }
         
-        // Set all values to 0 when there's an error
+        // For any other error, show zeros but don't set static values
         setStats([
           {
             title: 'Pacientes Activos',
             value: '0',
-            trend: '0',
+            trend: 'Sin datos',
             icon: '👥',
             color: 'var(--primary)',
             bgColor: 'rgba(15, 118, 110, 0.1)'
@@ -144,7 +116,7 @@ function Dashboard() {
           {
             title: 'Pacientes de Riesgo',
             value: '0',
-            trend: '0',
+            trend: 'Sin datos',
             icon: '🚨',
             color: 'var(--error)',
             bgColor: 'rgba(239, 68, 68, 0.1)'
@@ -152,7 +124,7 @@ function Dashboard() {
           {
             title: 'Pacientes Hospitalizados',
             value: '0',
-            trend: '0',
+            trend: 'Sin datos',
             icon: '🏥',
             color: 'var(--warning)',
             bgColor: 'rgba(245, 158, 11, 0.1)'
@@ -160,7 +132,7 @@ function Dashboard() {
           {
             title: 'Notas de Enfermería Hoy',
             value: '0',
-            trend: '0',
+            trend: 'Sin datos',
             icon: '📝',
             color: 'var(--success)',
             bgColor: 'rgba(16, 185, 129, 0.1)'
@@ -219,12 +191,12 @@ function Dashboard() {
     }
   ];
 
-  if (loading) {
+  if (loading || !stats) {
     return (
       <div className="container" style={{ paddingTop: 'var(--space-8)', paddingBottom: 'var(--space-8)' }}>
         <div className="d-flex justify-content-center">
           <div className="spinner-border" role="status">
-            <span className="visually-hidden">Cargando...</span>
+            <span className="visually-hidden">Cargando datos del tablero...</span>
           </div>
         </div>
       </div>
