@@ -29,7 +29,7 @@ function Dashboard() {
       bgColor: 'rgba(245, 158, 11, 0.1)'
     },
     {
-      title: 'Órdenes Hoy',
+      title: 'Notas de Enfermería Hoy',
       value: '0',
       trend: '0',
       icon: '📝',
@@ -61,6 +61,14 @@ function Dashboard() {
         const today = new Date().toISOString().split('T')[0];
         const notasHoy = notas.filter(n => n.fecha === today).length;
         
+        // Count critical patients (example: patients with risk factors)
+        const casosCriticos = pacientes.filter(p => 
+          p.riesgo_suicidio || p.riesgo_violencia || p.riesgo_fuga || p.riesgo_caidas
+        ).length;
+        
+        // Count patients pending discharge (patients without discharge date)
+        const pendientesAlta = pacientes.filter(p => !p.fecha_salida).length;
+        
         // Update stats with real data
         setStats([
           {
@@ -72,23 +80,23 @@ function Dashboard() {
             bgColor: 'rgba(15, 118, 110, 0.1)'
           },
           {
-            title: 'Pacientes Internos',
-            value: pacientesInternos.toString(),
-            trend: `${pacientesInternos > 0 ? '+' : ''}${pacientesInternos}`,
-            icon: '🏥',
+            title: 'Casos Críticos',
+            value: casosCriticos.toString(),
+            trend: `${casosCriticos > 0 ? '+' : ''}${casosCriticos}`,
+            icon: '🚨',
             color: 'var(--error)',
             bgColor: 'rgba(239, 68, 68, 0.1)'
           },
           {
-            title: 'Pacientes Externos',
-            value: pacientesExternos.toString(),
-            trend: `${pacientesExternos > 0 ? '+' : ''}${pacientesExternos}`,
-            icon: '🚶',
+            title: 'Pendientes de Alta',
+            value: pendientesAlta.toString(),
+            trend: `${pendientesAlta > 0 ? '+' : ''}${pendientesAlta}`,
+            icon: '📋',
             color: 'var(--warning)',
             bgColor: 'rgba(245, 158, 11, 0.1)'
           },
           {
-            title: 'Notas Hoy',
+            title: 'Notas de Enfermería Hoy',
             value: notasHoy.toString(),
             trend: `${notasHoy > 0 ? '+' : ''}${notasHoy}`,
             icon: '📝',
