@@ -27,7 +27,9 @@ app.use(cors({
       /https:\/\/.*\.replit\.dev$/,
       /https:\/\/.*\.replit\.dev:\d+$/,
       /https:\/\/.*\.repl\.co$/,
-      /https:\/\/.*\.repl\.co:\d+$/
+      /https:\/\/.*\.repl\.co:\d+$/,
+      /https:\/\/.*\.replit\.app$/,
+      /https:\/\/.*\.replit\.app:\d+$/
     ];
 
     // Check if origin matches any allowed pattern
