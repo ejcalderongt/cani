@@ -46,30 +46,29 @@ function Dashboard() {
       try {
         console.log('Fetching dashboard data...');
         
-        // First check if user is authenticated
-        const authCheck = await axios.get('/api/status');
-        console.log('Auth check result:', authCheck.data);
+        // Try to fetch data - if any request fails, show zeros
+        const [pacientesResponse, notasResponse] = await Promise.allSettled([
+          axios.get('/api/pacientes'),
+          axios.get('/api/notas')
+        ]);
         
-        if (!authCheck.data.session?.enfermero_id) {
-          console.log('User not authenticated, redirecting to login');
-          navigate('/login');
-          return;
-        }
-        
-        // Fetch real data from APIs sequentially to avoid overwhelming server
-        const pacientesResponse = await axios.get('/api/pacientes');
-        const notasResponse = await axios.get('/api/notas'); 
-        const signosResponse = await axios.get('/api/signos-vitales');
-        
-        const pacientes = pacientesResponse.data || [];
-        const notas = notasResponse.data || [];
-        const signos = signosResponse.data || [];
+        // Check if requests were successful
+        const pacientes = pacientesResponse.status === 'fulfilled' ? (pacientesResponse.value.data || []) : [];
+        const notas = notasResponse.status === 'fulfilled' ? (notasResponse.value.data || []) : [];
         
         console.log('Dashboard data fetched:', {
           pacientes: pacientes.length,
           notas: notas.length,
-          signos: signos.length
+          pacientesRequestStatus: pacientesResponse.status,
+          notasRequestStatus: notasResponse.status
         });
+        
+        // If any request failed, redirect to login
+        if (pacientesResponse.status === 'rejected' && pacientesResponse.reason?.response?.status === 401) {
+          console.log('User not authenticated, redirecting to login');
+          navigate('/login');
+          return;
+        }
         
         // Count active patients (patients without discharge date)
         const pacientesActivos = pacientes.filter(p => !p.fecha_salida && p.activo !== false).length;
@@ -86,7 +85,7 @@ function Dashboard() {
         // Count patients pending discharge (active patients without discharge date)
         const pendientesAlta = pacientes.filter(p => !p.fecha_salida && p.activo !== false).length;
         
-        // Update stats with real data
+        // Always update stats with actual counts (including 0 if no data)
         setStats([
           {
             title: 'Pacientes Activos',
@@ -121,6 +120,7 @@ function Dashboard() {
             bgColor: 'rgba(16, 185, 129, 0.1)'
           }
         ]);
+        
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
         
@@ -131,7 +131,7 @@ function Dashboard() {
           return;
         }
         
-        // Set all values to 0 when there's an error or no data
+        // Set all values to 0 when there's an error
         setStats([
           {
             title: 'Pacientes Activos',
@@ -171,13 +171,8 @@ function Dashboard() {
       }
     };
 
-    // Add a small delay to ensure session is established after login
-    const timeoutId = setTimeout(() => {
-      fetchDashboardData();
-    }, 500);
-
-    return () => clearTimeout(timeoutId);
-  }, []);
+    fetchDashboardData();
+  }, [navigate]);
 
   const quickActions = [
     {

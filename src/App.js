@@ -73,14 +73,13 @@ function App() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is already logged in by trying to access a protected route
+    // Check if user is already logged in by checking session status
     const checkAuth = async () => {
       try {
-        const response = await axios.get('/api/pacientes');
-        if (response.status === 200) {
-          // User is authenticated, but we don't have user info stored
-          // We'll set a placeholder until they login again
-          setEnfermero({ authenticated: true });
+        const response = await axios.get('/api/status');
+        if (response.data.session?.enfermero_id) {
+          // User has a valid session
+          setEnfermero(response.data.session);
         }
       } catch (error) {
         // User is not authenticated, that's fine
