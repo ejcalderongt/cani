@@ -1,41 +1,111 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
 
 function Dashboard() {
-  const stats = [
+  const [stats, setStats] = useState([
     {
       title: 'Pacientes Activos',
-      value: '24',
-      trend: '+2',
+      value: '0',
+      trend: '0',
       icon: '👥',
       color: 'var(--primary)',
       bgColor: 'rgba(15, 118, 110, 0.1)'
     },
     {
       title: 'Casos Críticos',
-      value: '3',
-      trend: '-1',
+      value: '0',
+      trend: '0',
       icon: '🚨',
       color: 'var(--error)',
       bgColor: 'rgba(239, 68, 68, 0.1)'
     },
     {
       title: 'Pendientes de Alta',
-      value: '7',
-      trend: '+3',
+      value: '0',
+      trend: '0',
       icon: '📋',
       color: 'var(--warning)',
       bgColor: 'rgba(245, 158, 11, 0.1)'
     },
     {
       title: 'Órdenes Hoy',
-      value: '42',
-      trend: '+12',
+      value: '0',
+      trend: '0',
       icon: '📝',
       color: 'var(--success)',
       bgColor: 'rgba(16, 185, 129, 0.1)'
     }
-  ];
+  ]);
+  
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const fetchDashboardData = async () => {
+      try {
+        // Fetch real data from APIs
+        const pacientesResponse = await axios.get('/api/pacientes');
+        const notasResponse = await axios.get('/api/notas');
+        const signosResponse = await axios.get('/api/signos-vitales');
+        
+        const pacientes = pacientesResponse.data;
+        const notas = notasResponse.data;
+        const signos = signosResponse.data;
+        
+        // Count patients by type
+        const pacientesActivos = pacientes.length;
+        const pacientesInternos = pacientes.filter(p => p.tipo_paciente === 'interno').length;
+        const pacientesExternos = pacientes.filter(p => p.tipo_paciente === 'externo').length;
+        
+        // Count notes from today
+        const today = new Date().toISOString().split('T')[0];
+        const notasHoy = notas.filter(n => n.fecha === today).length;
+        
+        // Update stats with real data
+        setStats([
+          {
+            title: 'Pacientes Activos',
+            value: pacientesActivos.toString(),
+            trend: `${pacientesActivos > 0 ? '+' : ''}${pacientesActivos}`,
+            icon: '👥',
+            color: 'var(--primary)',
+            bgColor: 'rgba(15, 118, 110, 0.1)'
+          },
+          {
+            title: 'Pacientes Internos',
+            value: pacientesInternos.toString(),
+            trend: `${pacientesInternos > 0 ? '+' : ''}${pacientesInternos}`,
+            icon: '🏥',
+            color: 'var(--error)',
+            bgColor: 'rgba(239, 68, 68, 0.1)'
+          },
+          {
+            title: 'Pacientes Externos',
+            value: pacientesExternos.toString(),
+            trend: `${pacientesExternos > 0 ? '+' : ''}${pacientesExternos}`,
+            icon: '🚶',
+            color: 'var(--warning)',
+            bgColor: 'rgba(245, 158, 11, 0.1)'
+          },
+          {
+            title: 'Notas Hoy',
+            value: notasHoy.toString(),
+            trend: `${notasHoy > 0 ? '+' : ''}${notasHoy}`,
+            icon: '📝',
+            color: 'var(--success)',
+            bgColor: 'rgba(16, 185, 129, 0.1)'
+          }
+        ]);
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+        // Keep default values if error occurs
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchDashboardData();
+  }, []);
 
   const quickActions = [
     {
@@ -81,6 +151,18 @@ function Dashboard() {
       color: 'var(--purple)'
     }
   ];
+
+  if (loading) {
+    return (
+      <div className="container" style={{ paddingTop: 'var(--space-8)', paddingBottom: 'var(--space-8)' }}>
+        <div className="d-flex justify-content-center">
+          <div className="spinner-border" role="status">
+            <span className="visually-hidden">Cargando...</span>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="container" style={{ paddingTop: 'var(--space-8)', paddingBottom: 'var(--space-8)' }}>
