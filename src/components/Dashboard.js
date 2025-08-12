@@ -44,18 +44,27 @@ function Dashboard() {
     const fetchDashboardData = async () => {
       try {
         // Fetch real data from APIs
-        const pacientesResponse = await axios.get('/api/pacientes');
-        const notasResponse = await axios.get('/api/notas');
-        const signosResponse = await axios.get('/api/signos-vitales');
+        const [pacientesResponse, notasResponse, signosResponse] = await Promise.allSettled([
+          axios.get('/api/pacientes'),
+          axios.get('/api/notas'), 
+          axios.get('/api/signos-vitales')
+        ]);
         
-        const pacientes = pacientesResponse.data;
-        const notas = notasResponse.data;
-        const signos = signosResponse.data;
+        // Handle responses, using empty arrays if requests failed
+        const pacientes = pacientesResponse.status === 'fulfilled' ? pacientesResponse.value.data || [] : [];
+        const notas = notasResponse.status === 'fulfilled' ? notasResponse.value.data || [] : [];
+        const signos = signosResponse.status === 'fulfilled' ? signosResponse.value.data || [] : [];
+        
+        console.log('Dashboard data loaded:', {
+          pacientes: pacientes.length,
+          notas: notas.length,
+          signos: signos.length
+        });
         
         // Count active patients (patients without discharge date)
-        const pacientesActivos = pacientes.filter(p => !p.fecha_salida && p.activo).length;
-        const pacientesInternos = pacientes.filter(p => p.tipo_paciente === 'interno' && !p.fecha_salida && p.activo).length;
-        const pacientesExternos = pacientes.filter(p => p.tipo_paciente === 'externo' && !p.fecha_salida && p.activo).length;
+        const pacientesActivos = pacientes.filter(p => !p.fecha_salida && p.activo !== false).length;
+        const pacientesInternos = pacientes.filter(p => p.tipo_paciente === 'interno' && !p.fecha_salida && p.activo !== false).length;
+        const pacientesExternos = pacientes.filter(p => p.tipo_paciente === 'externo' && !p.fecha_salida && p.activo !== false).length;
         
         // Count notes from today
         const today = new Date().toISOString().split('T')[0];
@@ -63,11 +72,11 @@ function Dashboard() {
         
         // Count critical patients (patients with any risk factor and still active)
         const casosCriticos = pacientes.filter(p => 
-          !p.fecha_salida && (p.riesgo_suicidio || p.riesgo_violencia || p.riesgo_fuga || p.riesgo_caidas)
+          !p.fecha_salida && p.activo !== false && (p.riesgo_suicidio || p.riesgo_violencia || p.riesgo_fuga || p.riesgo_caidas)
         ).length;
         
         // Count patients pending discharge (active patients without discharge date)
-        const pendientesAlta = pacientes.filter(p => !p.fecha_salida && p.activo).length;
+        const pendientesAlta = pacientes.filter(p => !p.fecha_salida && p.activo !== false).length;
         
         // Update stats with real data
         setStats([
@@ -106,7 +115,41 @@ function Dashboard() {
         ]);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
-        // Keep default values if error occurs
+        // Set all values to 0 when there's an error
+        setStats([
+          {
+            title: 'Pacientes Activos',
+            value: '0',
+            trend: '0',
+            icon: '👥',
+            color: 'var(--primary)',
+            bgColor: 'rgba(15, 118, 110, 0.1)'
+          },
+          {
+            title: 'Pacientes de Riesgo',
+            value: '0',
+            trend: '0',
+            icon: '🚨',
+            color: 'var(--error)',
+            bgColor: 'rgba(239, 68, 68, 0.1)'
+          },
+          {
+            title: 'Pacientes Hospitalizados',
+            value: '0',
+            trend: '0',
+            icon: '🏥',
+            color: 'var(--warning)',
+            bgColor: 'rgba(245, 158, 11, 0.1)'
+          },
+          {
+            title: 'Notas de Enfermería Hoy',
+            value: '0',
+            trend: '0',
+            icon: '📝',
+            color: 'var(--success)',
+            bgColor: 'rgba(16, 185, 129, 0.1)'
+          }
+        ]);
       } finally {
         setLoading(false);
       }

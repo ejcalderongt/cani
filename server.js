@@ -342,7 +342,14 @@ async function initDatabase() {
 
 // Authentication middleware
 const requireAuth = (req, res, next) => {
+  console.log('Auth check:', {
+    session: req.session,
+    enfermero_id: req.session?.enfermero_id,
+    url: req.url
+  });
+  
   if (!req.session.enfermero_id) {
+    console.log('Authentication failed - no enfermero_id in session');
     return res.status(401).json({ error: 'No autenticado' });
   }
   next();
@@ -1045,6 +1052,40 @@ app.get('/api/health', (req, res) => {
     message: 'Hospital Management System API is running',
     timestamp: new Date().toISOString()
   });
+});
+
+// Database status endpoint for debugging
+app.get('/api/status', async (req, res) => {
+  try {
+    const pacientesCount = await pool.query('SELECT COUNT(*) FROM pacientes WHERE activo = true');
+    const notasCount = await pool.query('SELECT COUNT(*) FROM notas_enfermeria');
+    const enfermerosCount = await pool.query('SELECT COUNT(*) FROM enfermeros WHERE activo = true');
+    const signosCount = await pool.query('SELECT COUNT(*) FROM signos_vitales');
+    
+    res.json({
+      status: 'OK',
+      database: 'Connected',
+      counts: {
+        pacientes: parseInt(pacientesCount.rows[0].count),
+        notas: parseInt(notasCount.rows[0].count),
+        enfermeros: parseInt(enfermerosCount.rows[0].count),
+        signos_vitales: parseInt(signosCount.rows[0].count)
+      },
+      session: {
+        has_session: !!req.session,
+        enfermero_id: req.session?.enfermero_id || null
+      },
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    console.error('Database status check failed:', error);
+    res.status(500).json({
+      status: 'ERROR',
+      database: 'Disconnected',
+      error: error.message,
+      timestamp: new Date().toISOString()
+    });
+  }
 });
 
 // Catch-all handler: send back React's index.html file for any non-API routes
