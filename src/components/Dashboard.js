@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import axios from 'axios';
 
 function Dashboard() {
+  const navigate = useNavigate();
   const [stats, setStats] = useState([
     {
       title: 'Pacientes Activos',
@@ -51,9 +52,28 @@ function Dashboard() {
         ]);
         
         // Handle responses, using empty arrays if requests failed
-        const pacientes = pacientesResponse.status === 'fulfilled' ? pacientesResponse.value.data || [] : [];
-        const notas = notasResponse.status === 'fulfilled' ? notasResponse.value.data || [] : [];
-        const signos = signosResponse.status === 'fulfilled' ? signosResponse.value.data || [] : [];
+        const pacientes = (pacientesResponse.status === 'fulfilled' && pacientesResponse.value?.data) ? pacientesResponse.value.data : [];
+        const notas = (notasResponse.status === 'fulfilled' && notasResponse.value?.data) ? notasResponse.value.data : [];
+        const signos = (signosResponse.status === 'fulfilled' && signosResponse.value?.data) ? signosResponse.value.data : [];
+        
+        // Log the actual responses for debugging
+        console.log('Dashboard API responses:', {
+          pacientes: {
+            status: pacientesResponse.status,
+            reason: pacientesResponse.status === 'rejected' ? pacientesResponse.reason?.message : 'success',
+            data: pacientes.length
+          },
+          notas: {
+            status: notasResponse.status,
+            reason: notasResponse.status === 'rejected' ? notasResponse.reason?.message : 'success',
+            data: notas.length
+          },
+          signos: {
+            status: signosResponse.status,
+            reason: signosResponse.status === 'rejected' ? signosResponse.reason?.message : 'success',
+            data: signos.length
+          }
+        });
         
         console.log('Dashboard data loaded:', {
           pacientes: pacientes.length,
@@ -115,6 +135,14 @@ function Dashboard() {
         ]);
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
+        
+        // Check if the error is due to authentication
+        if (error.response?.status === 401) {
+          console.log('User not authenticated, redirecting to login');
+          navigate('/login');
+          return;
+        }
+        
         // Set all values to 0 when there's an error
         setStats([
           {
