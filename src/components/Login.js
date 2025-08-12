@@ -25,9 +25,9 @@ function Login({ onLogin }) {
     try {
       console.log('Attempting login with:', { codigo: formData.codigo });
 
-      // Create axios instance with proper configuration for Replit
+      // Create axios instance with proper configuration for production
       const axiosInstance = axios.create({
-        baseURL: window.location.origin.replace(':3001', ':3002'), // Use port 3002 which maps to 5001
+        baseURL: window.location.origin, // Use same origin in production
         withCredentials: true,
         timeout: 15000,
         headers: {
