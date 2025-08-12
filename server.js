@@ -59,6 +59,12 @@ app.use(express.json());
 // Serve static files from the React app build directory
 app.use(express.static(path.join(__dirname, 'build')));
 
+// Add logging middleware to debug requests
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`, req.body ? JSON.stringify(req.body) : '');
+  next();
+});
+
 app.use(session({
   store: new pgSession({
     pool: pool,

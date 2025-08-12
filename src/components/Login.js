@@ -51,6 +51,12 @@ function Login({ onLogin }) {
       }
     } catch (error) {
       console.error('Login error:', error);
+      console.error('Login error details:', {
+        message: error.message,
+        response: error.response?.data,
+        status: error.response?.status,
+        url: error.config?.url
+      });
 
       if (error.code === 'ECONNABORTED') {
         setError('Tiempo de espera agotado. Verifica tu conexión.');
