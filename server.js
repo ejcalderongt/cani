@@ -257,6 +257,11 @@ async function initDatabase() {
       await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS riesgo_violencia BOOLEAN DEFAULT false`);
       await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS riesgo_fuga BOOLEAN DEFAULT false`);
       await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS riesgo_caidas BOOLEAN DEFAULT false`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fecha_salida DATE`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS observaciones_alta TEXT`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS medico_autoriza VARCHAR(100)`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS enfermero_autoriza VARCHAR(100)`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS director_autoriza VARCHAR(100)`);
     } catch (error) {
       // Columns might already exist
     }
@@ -468,7 +473,9 @@ app.post('/api/pacientes', requireAuth, async (req, res) => {
       numero_expediente, nombre, apellidos, fecha_nacimiento, documento_identidad,
       nacionalidad, contacto_emergencia_nombre, contacto_emergencia_telefono,
       telefono_principal, telefono_secundario, tipo_sangre, peso, estatura,
-      padecimientos, informacion_general, tipo_paciente, cuarto_asignado
+      padecimientos, informacion_general, tipo_paciente, cuarto_asignado,
+      sexo, fecha_ingreso, motivo_ingreso, fase_tratamiento, unidad_cama, medico_tratante,
+      equipo_tratante, riesgo_suicidio, riesgo_violencia, riesgo_fuga, riesgo_caidas
     } = req.body;
 
     const result = await pool.query(`
@@ -476,14 +483,18 @@ app.post('/api/pacientes', requireAuth, async (req, res) => {
         numero_expediente, nombre, apellidos, fecha_nacimiento, documento_identidad,
         nacionalidad, contacto_emergencia_nombre, contacto_emergencia_telefono,
         telefono_principal, telefono_secundario, tipo_sangre, peso, estatura,
-        padecimientos, informacion_general, tipo_paciente, cuarto_asignado
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
+        padecimientos, informacion_general, tipo_paciente, cuarto_asignado,
+        sexo, fecha_ingreso, motivo_ingreso, fase_tratamiento, unidad_cama, medico_tratante,
+        equipo_tratante, riesgo_suicidio, riesgo_violencia, riesgo_fuga, riesgo_caidas
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
       RETURNING *
     `, [
       numero_expediente, nombre, apellidos, fecha_nacimiento, documento_identidad,
       nacionalidad, contacto_emergencia_nombre, contacto_emergencia_telefono,
       telefono_principal, telefono_secundario, tipo_sangre, peso, estatura,
-      padecimientos, informacion_general, tipo_paciente, cuarto_asignado
+      padecimientos, informacion_general, tipo_paciente, cuarto_asignado,
+      sexo, fecha_ingreso, motivo_ingreso, fase_tratamiento, unidad_cama, medico_tratante,
+      equipo_tratante, riesgo_suicidio, riesgo_violencia, riesgo_fuga, riesgo_caidas
     ]);
 
     res.status(201).json(result.rows[0]);
@@ -1018,7 +1029,7 @@ app.get('*', (req, res) => {
   if (req.path.startsWith('/api/')) {
     return res.status(404).json({ error: 'API endpoint not found' });
   }
-  
+
   // Serve React build files
   res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });

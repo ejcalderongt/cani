@@ -187,7 +187,28 @@ function Dashboard() {
         marginBottom: 'var(--space-8)' 
       }}>
         {stats.map((stat, index) => (
-          <div key={index} className="medical-card" style={{ padding: 'var(--space-6)' }}>
+          <Link 
+            key={index} 
+            to={stat.title === 'Pacientes Activos' ? '/pacientes' : '#'}
+            style={{ textDecoration: 'none' }}
+          >
+            <div className="medical-card" style={{ 
+              padding: 'var(--space-6)',
+              cursor: stat.title === 'Pacientes Activos' ? 'pointer' : 'default',
+              transition: 'all 0.15s ease'
+            }}
+            onMouseOver={(e) => {
+              if (stat.title === 'Pacientes Activos') {
+                e.currentTarget.style.transform = 'translateY(-2px)';
+                e.currentTarget.style.boxShadow = 'var(--shadow)';
+              }
+            }}
+            onMouseOut={(e) => {
+              if (stat.title === 'Pacientes Activos') {
+                e.currentTarget.style.transform = 'translateY(0)';
+                e.currentTarget.style.boxShadow = '0 6px 24px #0f172a0f';
+              }
+            }}>
             <div className="flex justify-between items-center" style={{ marginBottom: 'var(--space-4)' }}>
               <div 
                 style={{ 
@@ -233,6 +254,7 @@ function Dashboard() {
               {stat.title}
             </p>
           </div>
+          </Link>
         ))}
       </div>
 
