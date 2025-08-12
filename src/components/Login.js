@@ -43,10 +43,18 @@ function Login({ onLogin }) {
           setUserForPasswordChange(response.data.enfermero);
           setShowPasswordChange(true);
         } else {
-          // Wait a moment for session to be established before redirecting
-          setTimeout(() => {
+          // Get complete user session data after login
+          try {
+            const sessionResponse = await axiosInstance.get('/api/status');
+            if (sessionResponse.data.session) {
+              onLogin(sessionResponse.data.session);
+            } else {
+              onLogin(response.data.enfermero);
+            }
+          } catch (error) {
+            // Fallback to login response data
             onLogin(response.data.enfermero);
-          }, 250);
+          }
         }
       } else {
         setError(response.data.message || 'Error de autenticación');
