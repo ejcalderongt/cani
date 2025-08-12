@@ -39,7 +39,7 @@ function CambiarPassword({ enfermero, onPasswordChanged, onCancel }) {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/change-password', {
+      const response = await fetch('/api/cambiar-clave', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

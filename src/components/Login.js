@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import axios from 'axios';
-import CambiarClave from './CambiarClave';
+import CambiarPassword from './CambiarPassword';
 
 function Login({ onLogin }) {
   const [formData, setFormData] = useState({ codigo: '', clave: '' });
@@ -98,7 +98,7 @@ function Login({ onLogin }) {
 
   if (showPasswordChange && userForPasswordChange) {
     return (
-      <CambiarClave
+      <CambiarPassword
         enfermero={userForPasswordChange}
         onPasswordChanged={handlePasswordChanged}
         onCancel={handlePasswordChangeCancel}

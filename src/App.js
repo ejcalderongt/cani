@@ -36,7 +36,7 @@ const getBaseURL = () => {
 // Set up axios with retry logic for Replit
 const setupAxios = () => {
   const baseURL = getBaseURL();
-  
+
   axios.defaults.baseURL = baseURL;
   axios.defaults.withCredentials = true;
   axios.defaults.timeout = 10000;
@@ -71,35 +71,39 @@ setupAxios();
 function App() {
   const [enfermero, setEnfermero] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [isAuthenticated, setIsAuthenticated] = useState(false); // State to manage authentication status
 
   useEffect(() => {
-    // Check if user is already logged in by checking session status
-    const checkAuth = async () => {
+    const checkAuthStatus = async () => {
       try {
         const response = await axios.get('/api/status');
-        if (response.data.session?.enfermero_id) {
-          // User has a valid session
+        if (response.data.session && !response.data.requiere_cambio_clave) {
           setEnfermero(response.data.session);
+          setIsAuthenticated(true);
+        } else if (response.data.requiere_cambio_clave) {
+          // User needs to change password, keep them in login flow
+          setIsAuthenticated(false);
         }
       } catch (error) {
-        // User is not authenticated, that's fine
-        console.log('User not authenticated');
+        console.error('Error checking auth status:', error);
       } finally {
         setLoading(false);
       }
     };
 
-    checkAuth();
+    checkAuthStatus();
   }, []);
 
   const handleLogin = (enfermeroData) => {
     setEnfermero(enfermeroData);
+    setIsAuthenticated(true); // Set isAuthenticated to true upon successful login
   };
 
   const handleLogout = async () => {
     try {
       await axios.post('/api/logout');
       setEnfermero(null);
+      setIsAuthenticated(false); // Set isAuthenticated to false on logout
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
     }
@@ -115,6 +119,9 @@ function App() {
     );
   }
 
+  // Determine if the user needs to change password
+  const requiresPasswordChange = !loading && !isAuthenticated && enfermero === null; // Simplified check, might need refinement based on API response
+
   return (
     <Router>
       <div className="App">
@@ -124,77 +131,77 @@ function App() {
           <Route
             path="/login"
             element={
-              enfermero ? <Navigate to="/" /> : <Login onLogin={handleLogin} />
+              isAuthenticated ? <Navigate to="/" /> : <Login onLogin={handleLogin} />
             }
           />
 
           <Route
             path="/"
             element={
-              enfermero ? <Dashboard /> : <Navigate to="/login" />
+              isAuthenticated ? <Dashboard /> : <Navigate to="/login" />
             }
           />
 
           <Route
             path="/pacientes"
             element={
-              enfermero ? <Pacientes /> : <Navigate to="/login" />
+              isAuthenticated ? <Pacientes /> : <Navigate to="/login" />
             }
           />
 
           <Route
             path="/pacientes/nuevo"
             element={
-              enfermero ? <NuevoPaciente /> : <Navigate to="/login" />
+              isAuthenticated ? <NuevoPaciente /> : <Navigate to="/login" />
             }
           />
 
           <Route
             path="/pacientes/:id"
             element={
-              enfermero ? <VerPaciente /> : <Navigate to="/login" />
+              isAuthenticated ? <VerPaciente /> : <Navigate to="/login" />
             }
           />
 
           <Route
             path="/notas"
             element={
-              enfermero ? <NotasEnfermeria /> : <Navigate to="/login" />
+              isAuthenticated ? <NotasEnfermeria /> : <Navigate to="/login" />
             }
           />
 
           <Route
             path="/notas/nueva"
             element={
-              enfermero ? <NuevaNota /> : <Navigate to="/login" />
+              isAuthenticated ? <NuevaNota /> : <Navigate to="/login" />
             }
           />
 
           <Route
             path="/signos-vitales"
             element={
-              enfermero ? <SignosVitales /> : <Navigate to="/login" />
+              isAuthenticated ? <SignosVitales /> : <Navigate to="/login" />
             }
           />
 
           <Route
             path="/medicamentos"
             element={
-              enfermero ? <Medicamentos /> : <Navigate to="/login" />
+              isAuthenticated ? <Medicamentos /> : <Navigate to="/login" />
             }
           />
 
           <Route
             path="/medicamentos/nuevo"
             element={
-              enfermero ? <NuevoMedicamento /> : <Navigate to="/login" />
+              isAuthenticated ? <NuevoMedicamento /> : <Navigate to="/login" />
             }
           />
 
           <Route
             path="/imprimir-notas"
             element={
-              enfermero ? <ImprimirNotas /> : <Navigate to="/login" />
+              isAuthenticated ? <ImprimirNotas /> : <Navigate to="/login" />
             }
           />
 
@@ -215,7 +222,7 @@ function App() {
           <Route
             path="/cambiar-clave"
             element={
-              enfermero ? <CambiarClave /> : <Navigate to="/login" />
+              isAuthenticated ? <CambiarClave /> : <Navigate to="/login" />
             }
           />
         </Routes>

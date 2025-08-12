@@ -4,6 +4,7 @@ const { Pool } = require('pg');
 const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const path = require('path');
+const bcrypt = require('bcryptjs');
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -319,10 +320,12 @@ async function initDatabase() {
 
     for (const user of defaultUsers) {
       if (!existingCodes.includes(user.codigo)) {
+        // Hash the default password before inserting
+        const hashedPassword = await bcrypt.hash(user.clave, 10);
         await pool.query(`
           INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno, debe_cambiar_clave, primer_login)
           VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `, [user.codigo, user.clave, user.nombre, user.apellidos, user.turno, user.debe_cambiar_clave, user.primer_login]);
+        `, [user.codigo, hashedPassword, user.nombre, user.apellidos, user.turno, user.debe_cambiar_clave, user.primer_login]);
         console.log(`Created user: ${user.codigo}`);
       }
     }
@@ -347,7 +350,7 @@ const requireAuth = (req, res, next) => {
     enfermero_id: req.session?.enfermero_id,
     url: req.url
   });
-  
+
   if (!req.session.enfermero_id) {
     console.log('Authentication failed - no enfermero_id in session');
     return res.status(401).json({ error: 'No autenticado' });
@@ -378,39 +381,47 @@ app.post('/api/login', async (req, res) => {
     const { codigo, clave } = req.body;
 
     const result = await pool.query(
-      'SELECT * FROM enfermeros WHERE codigo = $1 AND clave = $2 AND activo = true',
-      [codigo, clave]
+      'SELECT * FROM enfermeros WHERE codigo = $1 AND activo = true',
+      [codigo]
     );
 
     if (result.rows.length > 0) {
       const enfermero = result.rows[0];
+      const validPassword = await bcrypt.compare(clave, enfermero.clave);
 
-      // Check if user needs to change password (except admin)
-      if (enfermero.codigo !== 'admin' && (enfermero.debe_cambiar_clave || enfermero.primer_login)) {
-        return res.json({
+      if (validPassword) {
+        // Check if user needs to change password (except admin)
+        if (enfermero.codigo !== 'admin' && (enfermero.debe_cambiar_clave || enfermero.primer_login)) {
+          return res.json({
+            success: true,
+            requiere_cambio_clave: true,
+            enfermero: {
+              id: enfermero.id,
+              codigo: enfermero.codigo,
+              nombre: enfermero.nombre,
+              apellidos: enfermero.apellidos
+            }
+          });
+        }
+
+        req.session.enfermero_id = enfermero.id;
+        res.json({
           success: true,
-          requiere_cambio_clave: true,
           enfermero: {
             id: enfermero.id,
             codigo: enfermero.codigo,
             nombre: enfermero.nombre,
-            apellidos: enfermero.apellidos
+            apellidos: enfermero.apellidos,
+            turno: enfermero.turno,
+            activo: enfermero.activo
           }
         });
+      } else {
+        res.status(401).json({
+          success: false,
+          message: 'Código o clave incorrectos'
+        });
       }
-
-      req.session.enfermero_id = enfermero.id;
-      res.json({
-        success: true,
-        enfermero: {
-          id: enfermero.id,
-          codigo: enfermero.codigo,
-          nombre: enfermero.nombre,
-          apellidos: enfermero.apellidos,
-          turno: enfermero.turno,
-          activo: enfermero.activo
-        }
-      });
     } else {
       res.status(401).json({
         success: false,
@@ -428,30 +439,53 @@ app.post('/api/logout', (req, res) => {
   res.json({ success: true });
 });
 
-app.post('/api/change-password', async (req, res) => {
+app.post('/api/cambiar-clave', async (req, res) => {
   try {
     const { codigo, claveActual, nuevaClave } = req.body;
 
-    // Verify current password
-    const result = await pool.query(
-      'SELECT * FROM enfermeros WHERE codigo = $1 AND clave = $2 AND activo = true',
-      [codigo, claveActual]
-    );
-
-    if (result.rows.length === 0) {
-      return res.status(401).json({
+    if (!codigo || !claveActual || !nuevaClave) {
+      return res.status(400).json({ 
         success: false,
-        message: 'Contraseña actual incorrecta'
+        message: 'Datos incompletos' 
       });
     }
 
-    const enfermero = result.rows[0];
+    // Verify current password
+    const userResult = await pool.query('SELECT * FROM enfermeros WHERE codigo = $1', [codigo]);
 
-    // Update password and remove password change requirement
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ 
+        success: false,
+        message: 'Usuario no encontrado' 
+      });
+    }
+
+    const user = userResult.rows[0];
+    const validPassword = await bcrypt.compare(claveActual, user.clave); // Use user.clave here
+
+    if (!validPassword) {
+      return res.status(400).json({ 
+        success: false,
+        message: 'Contraseña actual incorrecta' 
+      });
+    }
+
+    // Hash new password and update
+    const hashedNewPassword = await bcrypt.hash(nuevaClave, 10);
+
     await pool.query(
-      'UPDATE enfermeros SET clave = $1, debe_cambiar_clave = false, primer_login = false WHERE id = $2',
-      [nuevaClave, enfermero.id]
+      'UPDATE enfermeros SET clave = $1, debe_cambiar_password = false, primer_login = false WHERE codigo = $2',
+      [hashedNewPassword, codigo]
     );
+
+    // Clear session to force re-login
+    if (req.session) {
+      req.session.destroy((err) => {
+        if (err) {
+          console.error('Error destroying session:', err);
+        }
+      });
+    }
 
     res.json({
       success: true,
@@ -460,7 +494,10 @@ app.post('/api/change-password', async (req, res) => {
 
   } catch (error) {
     console.error('Error changing password:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    res.status(500).json({ 
+      success: false,
+      message: 'Error interno del servidor' 
+    });
   }
 });
 
@@ -641,11 +678,13 @@ app.post('/api/admin/usuarios', requireAdmin, async (req, res) => {
   try {
     const { codigo, clave, nombre, apellidos, turno } = req.body;
 
+    const hashedPassword = await bcrypt.hash(clave, 10);
+
     const result = await pool.query(`
       INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno)
       VALUES ($1, $2, $3, $4, $5)
       RETURNING id, codigo, nombre, apellidos, turno, activo
-    `, [codigo, clave, nombre, apellidos, turno]);
+    `, [codigo, hashedPassword, nombre, apellidos, turno]);
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -670,12 +709,13 @@ app.put('/api/admin/usuarios/:id', requireAdmin, async (req, res) => {
     let params = [codigo, nombre, apellidos, turno, activo, id];
 
     if (clave && clave.trim() !== '') {
+      const hashedPassword = await bcrypt.hash(clave, 10);
       query = `
         UPDATE enfermeros 
         SET codigo = $1, clave = $2, nombre = $3, apellidos = $4, turno = $5, activo = $6
         WHERE id = $7 RETURNING id, codigo, nombre, apellidos, turno, activo
       `;
-      params = [codigo, clave, nombre, apellidos, turno, activo, id];
+      params = [codigo, hashedPassword, nombre, apellidos, turno, activo, id];
     } else {
       query += ` WHERE id = $6 RETURNING id, codigo, nombre, apellidos, turno, activo`;
     }
@@ -1056,34 +1096,34 @@ app.get('/api/health', (req, res) => {
 
 // Database status endpoint for debugging
 app.get('/api/status', async (req, res) => {
-  try {
-    const pacientesCount = await pool.query('SELECT COUNT(*) FROM pacientes WHERE activo = true');
-    const notasCount = await pool.query('SELECT COUNT(*) FROM notas_enfermeria');
-    const enfermerosCount = await pool.query('SELECT COUNT(*) FROM enfermeros WHERE activo = true');
-    const signosCount = await pool.query('SELECT COUNT(*) FROM signos_vitales');
-    
-    res.json({
-      status: 'OK',
-      database: 'Connected',
-      counts: {
-        pacientes: parseInt(pacientesCount.rows[0].count),
-        notas: parseInt(notasCount.rows[0].count),
-        enfermeros: parseInt(enfermerosCount.rows[0].count),
-        signos_vitales: parseInt(signosCount.rows[0].count)
-      },
-      session: {
-        has_session: !!req.session,
-        enfermero_id: req.session?.enfermero_id || null
-      },
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    console.error('Database status check failed:', error);
-    res.status(500).json({
-      status: 'ERROR',
-      database: 'Disconnected',
-      error: error.message,
-      timestamp: new Date().toISOString()
+  if (req.session && req.session.enfermero_id) {
+    try {
+      // Check if user needs to change password
+      const result = await pool.query(
+        'SELECT debe_cambiar_password FROM enfermeros WHERE id = $1',
+        [req.session.enfermero_id]
+      );
+
+      const requiereCambio = result.rows.length > 0 && result.rows[0].debe_cambiar_password;
+
+      res.json({ 
+        session: req.session,
+        authenticated: true,
+        requiere_cambio_clave: requiereCambio
+      });
+    } catch (error) {
+      console.error('Error checking password change requirement:', error);
+      res.json({ 
+        session: req.session,
+        authenticated: true,
+        requiere_cambio_clave: false
+      });
+    }
+  } else {
+    res.json({ 
+      session: null,
+      authenticated: false,
+      requiere_cambio_clave: false
     });
   }
 });
