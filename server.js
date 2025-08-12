@@ -55,9 +55,7 @@ app.use(cors({
 app.use(express.json());
 
 // Serve static files from the React app build directory
-if (process.env.NODE_ENV === 'production') {
-  app.use(express.static(path.join(__dirname, 'build')));
-}
+app.use(express.static(path.join(__dirname, 'build')));
 
 app.use(session({
   store: new pgSession({
@@ -1013,12 +1011,8 @@ app.get('*', (req, res) => {
     return res.status(404).json({ error: 'API endpoint not found' });
   }
   
-  // Always serve React build files when they exist
-  try {
-    res.sendFile(path.join(__dirname, 'build', 'index.html'));
-  } catch (error) {
-    res.json({ message: 'Hospital Management System - Please ensure the React app is built.' });
-  }
+  // Serve React build files
+  res.sendFile(path.join(__dirname, 'build', 'index.html'));
 });
 
 // Start server
