@@ -1,62 +1,39 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 
 function Dashboard() {
-  const navigate = useNavigate();
   const [stats, setStats] = useState(null);
-  
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchDashboardData = async () => {
-      setLoading(true);
-      
       try {
-        console.log('Fetching dashboard data...');
-        
-        // Check authentication status
-        const statusResponse = await axios.get('/api/status');
-        if (!statusResponse.data.authenticated || !statusResponse.data.session?.enfermero_id) {
-          console.log('User not authenticated, redirecting to login');
-          navigate('/login');
-          return;
-        }
-        
-        // Fetch data from API endpoints
+        // Fetch data from API endpoints with proper error handling
         const [pacientesResponse, notasResponse] = await Promise.allSettled([
           axios.get('/api/pacientes'),
           axios.get('/api/notas')
         ]);
-        
-        // Handle responses - if failed, use empty arrays
+
+        // Handle responses safely
         const pacientes = pacientesResponse.status === 'fulfilled' ? (pacientesResponse.value.data || []) : [];
         const notas = notasResponse.status === 'fulfilled' ? (notasResponse.value.data || []) : [];
-        
-        console.log('Dashboard data fetched:', {
-          pacientes: pacientes.length,
-          notas: notas.length,
-          pacientesSuccess: pacientesResponse.status === 'fulfilled',
-          notasSuccess: notasResponse.status === 'fulfilled'
-        });
-        
-        // Calculate real statistics from database
+
+        // Calculate statistics
         const pacientesActivos = Array.isArray(pacientes) ? 
           pacientes.filter(p => !p.fecha_salida && p.activo !== false).length : 0;
-        
+
         const today = new Date().toISOString().split('T')[0];
         const notasHoy = Array.isArray(notas) ? 
           notas.filter(n => n.fecha && n.fecha.startsWith(today)).length : 0;
-        
+
         const casosCriticos = Array.isArray(pacientes) ? 
           pacientes.filter(p => 
             !p.fecha_salida && 
             p.activo !== false && 
             (p.riesgo_suicidio || p.riesgo_violencia || p.riesgo_fuga || p.riesgo_caidas)
           ).length : 0;
-        
-        const pendientesAlta = pacientesActivos; // Same as active patients
-        
+
         // Set the calculated statistics
         setStats([
           {
@@ -77,8 +54,8 @@ function Dashboard() {
           },
           {
             title: 'Pacientes Hospitalizados',
-            value: pendientesAlta.toString(),
-            trend: `Hospitalizados: ${pendientesAlta}`,
+            value: pacientesActivos.toString(),
+            trend: `Hospitalizados: ${pacientesActivos}`,
             icon: '🏥',
             color: 'var(--warning)',
             bgColor: 'rgba(245, 158, 11, 0.1)'
@@ -92,18 +69,11 @@ function Dashboard() {
             bgColor: 'rgba(16, 185, 129, 0.1)'
           }
         ]);
-        
+
       } catch (error) {
         console.error('Error fetching dashboard data:', error);
-        
-        // If authentication error, redirect to login
-        if (error.response?.status === 401) {
-          console.log('Authentication error, redirecting to login');
-          navigate('/login');
-          return;
-        }
-        
-        // For any other error, show zeros but don't set static values
+
+        // Set default stats on error
         setStats([
           {
             title: 'Pacientes Activos',
@@ -144,7 +114,7 @@ function Dashboard() {
     };
 
     fetchDashboardData();
-  }, []); // Empty dependency array to run only once
+  }, []); // Only run once
 
   const quickActions = [
     {
@@ -235,64 +205,52 @@ function Dashboard() {
               padding: 'var(--space-6)',
               cursor: stat.title === 'Pacientes Activos' ? 'pointer' : 'default',
               transition: 'all 0.15s ease'
-            }}
-            onMouseOver={(e) => {
-              if (stat.title === 'Pacientes Activos') {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = 'var(--shadow)';
-              }
-            }}
-            onMouseOut={(e) => {
-              if (stat.title === 'Pacientes Activos') {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = '0 6px 24px #0f172a0f';
-              }
             }}>
-            <div className="flex justify-between items-center" style={{ marginBottom: 'var(--space-4)' }}>
-              <div 
-                style={{ 
-                  width: '48px', 
-                  height: '48px', 
-                  borderRadius: 'var(--radius-md)', 
-                  background: stat.bgColor,
-                  display: 'flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  fontSize: 'var(--text-xl)'
-                }}
-              >
-                {stat.icon}
+              <div className="flex justify-between items-center" style={{ marginBottom: 'var(--space-4)' }}>
+                <div 
+                  style={{ 
+                    width: '48px', 
+                    height: '48px', 
+                    borderRadius: 'var(--radius-md)', 
+                    background: stat.bgColor,
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    fontSize: 'var(--text-xl)'
+                  }}
+                >
+                  {stat.icon}
+                </div>
+                <span 
+                  style={{ 
+                    fontSize: 'var(--text-xs)', 
+                    fontWeight: '500',
+                    color: stat.color,
+                    background: stat.bgColor,
+                    padding: 'var(--space-1) var(--space-2)',
+                    borderRadius: 'var(--radius-sm)'
+                  }}
+                >
+                  {stat.trend}
+                </span>
               </div>
-              <span 
-                style={{ 
-                  fontSize: 'var(--text-xs)', 
-                  fontWeight: '500',
-                  color: stat.color,
-                  background: stat.bgColor,
-                  padding: 'var(--space-1) var(--space-2)',
-                  borderRadius: 'var(--radius-sm)'
-                }}
-              >
-                {stat.trend}
-              </span>
+              <h3 style={{ 
+                fontSize: 'var(--text-3xl)', 
+                fontWeight: '700', 
+                color: stat.color,
+                marginBottom: 'var(--space-2)'
+              }}>
+                {stat.value}
+              </h3>
+              <p style={{ 
+                fontSize: 'var(--text-sm)', 
+                color: 'var(--text)',
+                fontWeight: '500',
+                margin: 0
+              }}>
+                {stat.title}
+              </p>
             </div>
-            <h3 style={{ 
-              fontSize: 'var(--text-3xl)', 
-              fontWeight: '700', 
-              color: stat.color,
-              marginBottom: 'var(--space-2)'
-            }}>
-              {stat.value}
-            </h3>
-            <p style={{ 
-              fontSize: 'var(--text-sm)', 
-              color: 'var(--text)',
-              fontWeight: '500',
-              margin: 0
-            }}>
-              {stat.title}
-            </p>
-          </div>
           </Link>
         ))}
       </div>
@@ -319,16 +277,6 @@ function Dashboard() {
                 background: 'var(--bg-elev)',
                 transition: 'all 0.15s ease',
                 display: 'block'
-              }}
-              onMouseOver={(e) => {
-                e.currentTarget.style.transform = 'translateY(-2px)';
-                e.currentTarget.style.boxShadow = 'var(--shadow)';
-                e.currentTarget.style.borderColor = action.color;
-              }}
-              onMouseOut={(e) => {
-                e.currentTarget.style.transform = 'translateY(0)';
-                e.currentTarget.style.boxShadow = 'none';
-                e.currentTarget.style.borderColor = 'var(--border)';
               }}
             >
               <div className="flex items-center gap-4">

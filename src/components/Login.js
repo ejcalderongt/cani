@@ -23,41 +23,22 @@ function Login({ onLogin }) {
     setLoading(true);
 
     try {
-      console.log('Login attempt for user:', formData.codigo);
-
       const response = await axios.post('/api/login', formData);
 
       if (response.data.success) {
         if (response.data.requiere_cambio_clave) {
-          // User needs to change password
           setUserForPasswordChange(response.data.enfermero);
           setShowPasswordChange(true);
         } else {
-          // Get complete user session data after login
-          try {
-            const sessionResponse = await axios.get('/api/status');
-            if (sessionResponse.data.session) {
-              onLogin(sessionResponse.data.session);
-            } else {
-              onLogin(response.data.enfermero);
-            }
-          } catch (error) {
-            // Fallback to login response data
-            onLogin(response.data.enfermero);
-          }
+          onLogin(response.data.enfermero);
         }
       } else {
         setError(response.data.message || 'Error de autenticación');
       }
     } catch (error) {
-      console.error('Login failed:', error.message);
-
-      if (error.response?.status === 404) {
-        setError('Servidor no disponible. Intenta más tarde.');
-      } else if (error.response?.status === 401) {
-        setError(error.response.data?.message || 'Credenciales incorrectas');
-      } else if (error.code === 'ECONNABORTED') {
-        setError('Tiempo de espera agotado.');
+      console.error('Login failed:', error);
+      if (error.response?.status === 401) {
+        setError('Credenciales incorrectas');
       } else {
         setError('Error de conexión. Verifica que el servidor esté funcionando.');
       }
@@ -125,9 +106,8 @@ function Login({ onLogin }) {
               placeholder="Ingresa tu código"
               required
               autoComplete="username"
-              aria-describedby="codigo-help"
             />
-            <div id="codigo-help" className="form-text">
+            <div className="form-text">
               Usa tu código de empleado asignado
             </div>
           </div>
@@ -165,8 +145,6 @@ function Login({ onLogin }) {
             )}
           </button>
         </form>
-
-
       </div>
     </div>
   );

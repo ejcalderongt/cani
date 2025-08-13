@@ -9,7 +9,7 @@ import NuevoPaciente from './components/NuevoPaciente';
 import VerPaciente from './components/VerPaciente';
 import NotasEnfermeria from './components/NotasEnfermeria';
 import NuevaNota from './components/NuevaNota';
-import SignosVitales from './components/SignosVitales'; // Assuming SignosVitales component will be created
+import SignosVitales from './components/SignosVitales';
 import Medicamentos from './components/Medicamentos';
 import NuevoMedicamento from './components/NuevoMedicamento';
 import MantenimientoUsuarios from './components/MantenimientoUsuarios';
@@ -17,57 +17,25 @@ import ConfiguracionSistema from './components/ConfiguracionSistema';
 import ImprimirNotas from './components/ImprimirNotas';
 import CambiarClave from './components/CambiarClave';
 
-// Configure axios defaults
-const setupAxios = () => {
-  // Use relative URLs only
-  axios.defaults.baseURL = '';
-  axios.defaults.withCredentials = true;
-  axios.defaults.timeout = 10000;
-
-  // Add request interceptor for debugging
-  axios.interceptors.request.use(
-    (config) => {
-      console.log('API Request:', config.method?.toUpperCase(), config.url);
-      return config;
-    },
-    (error) => {
-      console.error('Request error:', error);
-      return Promise.reject(error);
-    }
-  );
-
-  // Add response interceptor for error handling
-  axios.interceptors.response.use(
-    (response) => response,
-    (error) => {
-      if (error.response?.status === 404) {
-        console.error('API endpoint not found:', error.config?.url);
-      }
-      return Promise.reject(error);
-    }
-  );
-};
-
-setupAxios();
+// Simple axios setup - only relative URLs
+axios.defaults.withCredentials = true;
+axios.defaults.timeout = 10000;
 
 function App() {
   const [enfermero, setEnfermero] = useState(null);
   const [loading, setLoading] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false); // State to manage authentication status
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
 
   useEffect(() => {
     const checkAuthStatus = async () => {
       try {
         const response = await axios.get('/api/status');
-        if (response.data.session && !response.data.requiere_cambio_clave) {
+        if (response.data.authenticated && response.data.session) {
           setEnfermero(response.data.session);
           setIsAuthenticated(true);
-        } else if (response.data.requiere_cambio_clave) {
-          // User needs to change password, keep them in login flow
-          setIsAuthenticated(false);
         }
       } catch (error) {
-        console.error('Error checking auth status:', error);
+        console.log('Not authenticated');
       } finally {
         setLoading(false);
       }
@@ -78,14 +46,14 @@ function App() {
 
   const handleLogin = (enfermeroData) => {
     setEnfermero(enfermeroData);
-    setIsAuthenticated(true); // Set isAuthenticated to true upon successful login
+    setIsAuthenticated(true);
   };
 
   const handleLogout = async () => {
     try {
       await axios.post('/api/logout');
       setEnfermero(null);
-      setIsAuthenticated(false); // Set isAuthenticated to false on logout
+      setIsAuthenticated(false);
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
     }
@@ -100,9 +68,6 @@ function App() {
       </div>
     );
   }
-
-  // Determine if the user needs to change password
-  const requiresPasswordChange = !loading && !isAuthenticated && enfermero === null; // Simplified check, might need refinement based on API response
 
   return (
     <Router>
