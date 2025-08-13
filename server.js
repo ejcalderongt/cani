@@ -9,6 +9,8 @@ const bcrypt = require('bcryptjs');
 const app = express();
 const port = process.env.PORT || 5000;
 
+console.log(`Starting server on port ${port}`);
+
 // Database configuration
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL || 'postgresql://localhost/hospital_db',
@@ -24,7 +26,8 @@ app.use(cors({
     // Allow all Replit domains and localhost for development
     const allowedOrigins = [
       'http://localhost:3000',
-      'http://localhost:3001',
+      'http://localhost:3001', 
+      'http://localhost:5000',
       'http://localhost:5001',
       /https:\/\/.*\.replit\.dev$/,
       /https:\/\/.*\.replit\.dev:\d+$/,
