@@ -25,7 +25,7 @@ function Login({ onLogin }) {
     try {
       console.log('Attempting login with:', { codigo: formData.codigo });
 
-      // Use global axios configuration - no need to create new instance
+      // Use global axios configuration with relative URL
       const response = await axios.post('/api/login', formData);
 
       if (response.data.success) {

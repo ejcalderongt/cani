@@ -19,8 +19,8 @@ import CambiarClave from './components/CambiarClave';
 
 // Configure axios defaults
 const setupAxios = () => {
-  // Always use same origin - this works for both Replit and production
-  axios.defaults.baseURL = window.location.origin;
+  // Use relative URLs - let browser handle the origin
+  axios.defaults.baseURL = '';
   axios.defaults.withCredentials = true;
   axios.defaults.timeout = 10000;
 
