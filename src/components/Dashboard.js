@@ -144,7 +144,7 @@ function Dashboard() {
     };
 
     fetchDashboardData();
-  }, []); // Remove navigate from dependencies to prevent infinite loop
+  }, []); // Empty dependency array to run only once
 
   const quickActions = [
     {

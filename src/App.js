@@ -19,15 +19,15 @@ import CambiarClave from './components/CambiarClave';
 
 // Configure axios defaults
 const setupAxios = () => {
-  // Use current window origin to ensure same port
-  axios.defaults.baseURL = window.location.origin;
+  // Use relative URLs to avoid port conflicts
+  axios.defaults.baseURL = '';
   axios.defaults.withCredentials = true;
   axios.defaults.timeout = 10000;
 
   // Add request interceptor for debugging
   axios.interceptors.request.use(
     (config) => {
-      console.log('Making request to:', config.baseURL + config.url);
+      console.log('Making request to:', config.url);
       return config;
     },
     (error) => {
