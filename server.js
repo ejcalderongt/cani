@@ -1299,5 +1299,9 @@ initDatabase().then(() => {
     console.log(`API endpoints available at: /api/*`);
     console.log('==========================================');
     console.log('Ready for connections!');
+    console.log('If you see 404 errors, make sure you are accessing the app on the correct port.');
   });
+}).catch(error => {
+  console.error('Failed to initialize database:', error);
+  process.exit(1);
 });
