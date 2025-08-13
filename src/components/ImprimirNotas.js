@@ -81,6 +81,16 @@ function ImprimirNotas() {
       minute: '2-digit'
     });
 
+    // Agrupar notas por fecha para mejor organización
+    const notasPorFecha = notas.reduce((acc, nota) => {
+      const fecha = nota.fecha;
+      if (!acc[fecha]) {
+        acc[fecha] = [];
+      }
+      acc[fecha].push(nota);
+      return acc;
+    }, {});
+
     return `
       <!DOCTYPE html>
       <html>
@@ -89,10 +99,28 @@ function ImprimirNotas() {
           <title>Notas de Enfermería - ${paciente?.nombre} ${paciente?.apellidos}</title>
           <style>
             body {
-              font-family: Arial, sans-serif;
-              margin: 20px;
-              font-size: 12px;
-              line-height: 1.4;
+              font-family: 'Times New Roman', serif;
+              margin: 15mm;
+              font-size: 11px;
+              line-height: 1.2;
+              color: #000;
+            }
+            .page {
+              min-height: 100vh;
+              page-break-after: always;
+            }
+            .page:last-child {
+              page-break-after: avoid;
+            }
+            .ruled-lines {
+              background-image: repeating-linear-gradient(
+                transparent,
+                transparent 18px,
+                #ccc 18px,
+                #ccc 19px
+              );
+              min-height: 400px;
+              padding: 5px;
             }
             .header {
               text-align: center;
@@ -248,55 +276,114 @@ function ImprimirNotas() {
             ` : ''}
           </div>
 
-          <div class="notes-section">
-            <h3 style="color: #0F766E; border-bottom: 1px solid #0F766E; padding-bottom: 5px;">NOTAS DE ENFERMERÍA</h3>
-            
-            ${notas.map(nota => `
-              <div class="note-item">
-                <div class="note-header">
-                  ${nota.fecha} - ${nota.hora} | Enfermero(a): ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
-                </div>
-                <div class="note-content">
-                  <div class="note-section">
-                    <label>OBSERVACIONES:</label>
-                    <div>${nota.observaciones || 'N/A'}</div>
-                  </div>
-                  
-                  ${nota.medicamentos_administrados ? `
-                  <div class="note-section">
-                    <label>MEDICAMENTOS ADMINISTRADOS:</label>
-                    <div>${nota.medicamentos_administrados}</div>
-                  </div>
-                  ` : ''}
-                  
-                  ${nota.tratamientos ? `
-                  <div class="note-section">
-                    <label>TRATAMIENTOS:</label>
-                    <div>${nota.tratamientos}</div>
-                  </div>
-                  ` : ''}
-                </div>
-              </div>
-            `).join('')}
+          <div class="form-header" style="border: 2px solid #000; padding: 10px; margin: 20px 0;">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="width: 70%; border-right: 1px solid #000; padding-right: 10px;">
+                  <strong>Nombre y apellidos del paciente:</strong><br>
+                  <span style="font-size: 14px;">${paciente?.nombre || ''} ${paciente?.apellidos || ''}</span>
+                </td>
+                <td style="width: 30%; padding-left: 10px; text-align: center;">
+                  <strong>No. Expediente:</strong><br>
+                  <span style="font-size: 14px;">${paciente?.numero_expediente || 'N/A'}</span>
+                </td>
+              </tr>
+              <tr style="border-top: 1px solid #000;">
+                <td style="border-right: 1px solid #000; padding-right: 10px; padding-top: 5px;">
+                  <strong>Sala:</strong> ${paciente?.cuarto_asignado || '_____________'}&nbsp;&nbsp;&nbsp;&nbsp;
+                  <strong>Cuarto:</strong> ${paciente?.unidad_cama || '_____________'}
+                </td>
+                <td style="padding-left: 10px; padding-top: 5px; text-align: center;">
+                  <strong>No. Cédula:</strong><br>
+                  ${paciente?.documento_identidad || '_____________'}
+                </td>
+              </tr>
+            </table>
           </div>
 
-          <div class="footer">
-            <p><strong>Total de notas:</strong> ${notas.length}</p>
-            <p><strong>Período:</strong> ${fechaInicio || 'Desde el inicio'} ${fechaFin ? 'hasta ' + fechaFin : 'hasta la fecha'}</p>
-            
-            <div class="signature-section">
-              ${[...new Set(notas.map(nota => `${nota.enfermero_nombre} ${nota.enfermero_apellidos}`))].map(enfermero => `
-                <div class="signature-box">
-                  <div class="signature-line">
-                    ${enfermero}<br>
-                    Enfermero(a)
-                  </div>
-                </div>
-              `).join('')}
+          <div class="notes-section">
+            <table style="width: 100%; border-collapse: collapse; border: 2px solid #000;">
+              <thead>
+                <tr style="background-color: #f0f0f0; border-bottom: 2px solid #000;">
+                  <th style="border-right: 1px solid #000; padding: 8px; width: 12%; text-align: center;">Fecha</th>
+                  <th style="border-right: 1px solid #000; padding: 8px; width: 8%; text-align: center;">Hora</th>
+                  <th style="border-right: 1px solid #000; padding: 8px; width: 60%; text-align: center;">Observaciones y Cuidados de Enfermería</th>
+                  <th style="padding: 8px; width: 20%; text-align: center;">Nombre y Firma</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${Object.keys(notasPorFecha).sort().map(fecha => 
+                  notasPorFecha[fecha].map((nota, index) => `
+                    <tr style="border-bottom: 1px solid #000; min-height: 80px;">
+                      <td style="border-right: 1px solid #000; padding: 8px; vertical-align: top; text-align: center;">
+                        ${index === 0 ? fecha.split('-').reverse().join('/') : ''}
+                      </td>
+                      <td style="border-right: 1px solid #000; padding: 8px; vertical-align: top; text-align: center;">
+                        ${nota.hora}
+                      </td>
+                      <td style="border-right: 1px solid #000; padding: 8px; vertical-align: top;">
+                        <div class="ruled-lines">
+                          <strong>OBSERVACIONES:</strong><br>
+                          ${nota.observaciones || ''}<br><br>
+                          ${nota.medicamentos_administrados ? `<strong>MEDICAMENTOS:</strong><br>${nota.medicamentos_administrados}<br><br>` : ''}
+                          ${nota.tratamientos ? `<strong>TRATAMIENTOS:</strong><br>${nota.tratamientos}<br>` : ''}
+                        </div>
+                      </td>
+                      <td style="padding: 8px; vertical-align: top; text-align: center;">
+                        <div style="height: 60px; display: flex; flex-direction: column; justify-content: space-between;">
+                          <div style="font-size: 10px;">
+                            ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
+                          </div>
+                          <div style="border-top: 1px solid #000; margin-top: 40px; padding-top: 2px; font-size: 8px;">
+                            Firma
+                          </div>
+                        </div>
+                      </td>
+                    </tr>
+                  `).join('')
+                ).join('')}
+                
+                <!-- Líneas vacías para completar la hoja -->
+                ${Array(Math.max(10 - notas.length, 0)).fill().map(() => `
+                  <tr style="border-bottom: 1px solid #000; height: 80px;">
+                    <td style="border-right: 1px solid #000; padding: 8px;"></td>
+                    <td style="border-right: 1px solid #000; padding: 8px;"></td>
+                    <td style="border-right: 1px solid #000; padding: 8px;">
+                      <div class="ruled-lines"></div>
+                    </td>
+                    <td style="padding: 8px;"></td>
+                  </tr>
+                `).join('')}
+              </tbody>
+            </table>
+          </div>
+
+          <div class="footer" style="margin-top: 30px; border: 2px solid #000; padding: 10px;">
+            <div style="text-align: center; margin-bottom: 10px;">
+              <small><strong>TODA NOTA DEBE INCLUIR:</strong> Nombre y apellido del profesional, así como la firma y código</small>
             </div>
             
-            <div class="print-info">
-              Documento generado el ${fechaImpresion}
+            <div style="border-top: 1px solid #000; padding-top: 10px;">
+              <div class="row" style="display: flex; justify-content: space-between;">
+                <div style="width: 30%; text-align: center;">
+                  <p><strong>Total de registros:</strong> ${notas.length}</p>
+                  <p><strong>Período:</strong><br>${fechaInicio || 'Inicio'} al ${fechaFin || new Date().toISOString().split('T')[0]}</p>
+                </div>
+                
+                <div style="width: 65%; display: flex; flex-wrap: wrap; gap: 20px;">
+                  ${[...new Set(notas.map(nota => nota.enfermero_nombre + ' ' + nota.enfermero_apellidos))].map(enfermero => `
+                    <div style="text-align: center; min-width: 150px;">
+                      <div style="height: 50px; border-bottom: 1px solid #000; margin-bottom: 5px;"></div>
+                      <small>${enfermero}<br>Enfermero(a)</small>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+            
+            <div style="text-align: center; font-size: 8px; color: #666; margin-top: 20px; border-top: 1px solid #ccc; padding-top: 5px;">
+              Documento generado automáticamente el ${fechaImpresion}<br>
+              Sistema Hospitalario - Notas de Enfermería con carácter legal
             </div>
           </div>
         </body>
