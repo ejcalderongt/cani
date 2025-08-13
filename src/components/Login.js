@@ -27,16 +27,7 @@ function Login({ onLogin }) {
 
       // Create axios instance with proper configuration
       const getBackendURL = () => {
-        // For Replit environment, use same origin
-        if (window.location.hostname.includes('replit.dev')) {
-          return window.location.origin;
-        }
-        
-        // For local development
-        if (window.location.hostname === 'localhost') {
-          return 'http://localhost:3000';
-        }
-        
+        // Always use same origin
         return window.location.origin;
       };
 

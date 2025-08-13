@@ -3,7 +3,7 @@ modules = ["nodejs-20", "postgresql-16"]
 channel = "stable-25_05"
 
 [workflows]
-runButton = "Hospital System Corrected"
+runButton = "Hospital System Simple"
 
 [[workflows.workflow]]
 name = "Run Hospital App"
@@ -104,6 +104,27 @@ args = "sleep 3"
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "concurrently --kill-others \"node server.js\" \"BROWSER=none PORT=3001 npm start\""
+
+[[workflows.workflow]]
+name = "Hospital System Simple"
+author = 44594929
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = 'pkill -f "node\|npm" || true'
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "sleep 3"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run build"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "node server.js"
 
 [[ports]]
 localPort = 3000
