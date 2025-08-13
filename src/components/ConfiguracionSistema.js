@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Container, Card, Button, Alert, Modal } from 'react-bootstrap';
 import axios from 'axios';
@@ -13,7 +12,7 @@ function ConfiguracionSistema() {
     setLoading(true);
     setError('');
     setSuccess('');
-    
+
     try {
       const response = await axios.post('/api/admin/reset-database');
       setSuccess(response.data.message);
@@ -33,6 +32,25 @@ function ConfiguracionSistema() {
     setShowConfirmModal(false);
   };
 
+  const insertSampleData = async () => {
+    if (!window.confirm('¿Desea cargar datos de ejemplo en el sistema? Esto creará pacientes, notas de enfermería y otros registros de prueba.')) {
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await axios.post('/api/admin/insert-sample-data');
+      setSuccess(response.data.message);
+    } catch (error) {
+      setError(error.response?.data?.error || 'Error al insertar los datos de ejemplo');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Container className="mt-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
@@ -44,7 +62,7 @@ function ConfiguracionSistema() {
           {error}
         </Alert>
       )}
-      
+
       {success && (
         <Alert variant="success" dismissible onClose={() => setSuccess('')}>
           {success}
@@ -62,18 +80,26 @@ function ConfiguracionSistema() {
                 Reinicializar la base de datos eliminará todos los pacientes, notas de enfermería 
                 y medicamentos personalizados. Los usuarios del sistema se mantendrán intactos.
               </p>
-              
+
               <div className="alert alert-warning">
                 <strong>⚠️ Advertencia:</strong> Esta acción es irreversible. 
                 Asegúrese de tener un respaldo si es necesario.
               </div>
-              
+
               <Button
                 variant="danger"
                 onClick={openConfirmModal}
                 disabled={loading}
+                className="me-2"
               >
                 {loading ? 'Reinicializando...' : 'Reinicializar Base de Datos'}
+              </Button>
+              <Button 
+                variant="success" 
+                onClick={insertSampleData}
+                disabled={loading}
+              >
+                {loading ? 'Procesando...' : 'Cargar Datos de Ejemplo'}
               </Button>
             </Card.Body>
           </Card>
