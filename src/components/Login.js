@@ -22,8 +22,14 @@ function Login({ onLogin }) {
     setError('');
     setLoading(true);
 
+    // Configure axios for this request with timeout and credentials
+    const axiosConfig = {
+      timeout: 15000,
+      withCredentials: true
+    };
+
     try {
-      const response = await axios.post('/api/login', formData);
+      const response = await axios.post('/api/login', formData, axiosConfig);
 
       if (response.data.success) {
         if (response.data.requiere_cambio_clave) {
