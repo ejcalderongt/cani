@@ -19,8 +19,8 @@ import CambiarClave from './components/CambiarClave';
 
 // Configure axios defaults
 const setupAxios = () => {
-  // Use relative URLs - let browser handle the origin
-  axios.defaults.baseURL = '';
+  // Use current window origin to ensure same port
+  axios.defaults.baseURL = window.location.origin;
   axios.defaults.withCredentials = true;
   axios.defaults.timeout = 10000;
 
