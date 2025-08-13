@@ -19,21 +19,20 @@ import CambiarClave from './components/CambiarClave';
 
 // Configure axios defaults
 const getBaseURL = () => {
-  // In Replit environment, the backend runs on the same domain
-  if (window.location.hostname.includes('replit.dev')) {
-    return '';
-  }
+  const isDevelopment = window.location.hostname === 'localhost' ||
+                       window.location.hostname.includes('replit.dev');
 
-  // For local development
-  if (process.env.NODE_ENV === 'development') {
+  if (isDevelopment) {
+    // In development, backend runs on port 5001
+    if (window.location.hostname.includes('replit.dev')) {
+      return window.location.origin.replace(':3001', ':5001');
+    }
     return 'http://localhost:5001';
   }
 
-  // Production - same domain
   return '';
 };
 
-// Set up axios with retry logic for Replit
 const setupAxios = () => {
   const baseURL = getBaseURL();
 

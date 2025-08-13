@@ -25,9 +25,22 @@ function Login({ onLogin }) {
     try {
       console.log('Attempting login with:', { codigo: formData.codigo });
 
-      // Create axios instance with proper configuration for production
+      // Create axios instance with proper configuration
+      const getBackendURL = () => {
+        const isDevelopment = window.location.hostname === 'localhost' || 
+                             window.location.hostname.includes('replit.dev');
+        
+        if (isDevelopment) {
+          if (window.location.hostname.includes('replit.dev')) {
+            return window.location.origin.replace(':3001', ':5001');
+          }
+          return 'http://localhost:5001';
+        }
+        return window.location.origin;
+      };
+
       const axiosInstance = axios.create({
-        baseURL: window.location.origin, // Use same origin in production
+        baseURL: getBackendURL(),
         withCredentials: true,
         timeout: 15000,
         headers: {
