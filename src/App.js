@@ -19,18 +19,18 @@ import CambiarClave from './components/CambiarClave';
 
 // Configure axios defaults
 const getBaseURL = () => {
-  // For Replit environment, use same origin (backend and frontend on same domain)
+  // For Replit environment, always use same origin
   if (window.location.hostname.includes('replit.dev')) {
     return window.location.origin;
   }
   
   // For local development
   if (window.location.hostname === 'localhost') {
-    return 'http://localhost:5001';
+    return 'http://localhost:3000';
   }
 
   // Production - same domain
-  return '';
+  return window.location.origin;
 };
 
 const setupAxios = () => {

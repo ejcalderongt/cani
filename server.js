@@ -1282,5 +1282,6 @@ initDatabase().then(() => {
     console.log(`Server running on http://0.0.0.0:${port}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`Database URL configured: ${!!process.env.DATABASE_URL}`);
+    console.log(`Frontend should connect to: ${port === 3000 ? 'same domain' : 'port ' + port}`);
   });
 });

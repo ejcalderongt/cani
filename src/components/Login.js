@@ -34,7 +34,7 @@ function Login({ onLogin }) {
         
         // For local development
         if (window.location.hostname === 'localhost') {
-          return 'http://localhost:5001';
+          return 'http://localhost:3000';
         }
         
         return window.location.origin;
