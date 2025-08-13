@@ -1272,19 +1272,32 @@ app.get('/api/status', async (req, res) => {
 app.get('*', (req, res) => {
   // Skip API routes
   if (req.path.startsWith('/api/')) {
+    console.log(`API endpoint not found: ${req.path}`);
     return res.status(404).json({ error: 'API endpoint not found' });
   }
 
+  // Log non-API requests
+  console.log(`Serving React app for: ${req.path}`);
+  
   // Serve React build files
-  res.sendFile(path.join(__dirname, 'build', 'index.html'));
+  const indexPath = path.join(__dirname, 'build', 'index.html');
+  res.sendFile(indexPath, (err) => {
+    if (err) {
+      console.error('Error serving index.html:', err);
+      res.status(500).send('Error loading application');
+    }
+  });
 });
 
 // Start server
 initDatabase().then(() => {
   app.listen(port, '0.0.0.0', () => {
-    console.log(`Server running on http://0.0.0.0:${port}`);
+    console.log(`Hospital System Server running on http://0.0.0.0:${port}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`Database URL configured: ${!!process.env.DATABASE_URL}`);
-    console.log(`Frontend should connect to: ${port === 3000 ? 'same domain' : 'port ' + port}`);
+    console.log(`Serving React build files from: ${path.join(__dirname, 'build')}`);
+    console.log(`API endpoints available at: /api/*`);
+    console.log('==========================================');
+    console.log('Ready for connections!');
   });
 });
