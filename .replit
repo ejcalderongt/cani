@@ -3,7 +3,7 @@ modules = ["nodejs-20", "postgresql-16"]
 channel = "stable-25_05"
 
 [workflows]
-runButton = "Hospital System Fixed and Working"
+runButton = "Hospital System Clean Start"
 
 [[workflows.workflow]]
 name = "Run Hospital App"
@@ -234,6 +234,35 @@ args = 'pkill -f "node\|npm" || true'
 [[workflows.workflow.tasks]]
 task = "shell.exec"
 args = "sleep 3"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm install"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run build"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "NODE_ENV=production PORT=5000 node server.js"
+
+[[workflows.workflow]]
+name = "Hospital System Clean Start"
+author = 44594929
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = 'pkill -f "node\|npm" || true'
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "sleep 3"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "rm -rf build"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"

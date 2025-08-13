@@ -23,9 +23,8 @@ function Login({ onLogin }) {
     setLoading(true);
 
     try {
-      console.log('Attempting login with:', { codigo: formData.codigo });
+      console.log('Login attempt for user:', formData.codigo);
 
-      // Use global axios configuration with relative URL
       const response = await axios.post('/api/login', formData);
 
       if (response.data.success) {
@@ -51,22 +50,16 @@ function Login({ onLogin }) {
         setError(response.data.message || 'Error de autenticación');
       }
     } catch (error) {
-      console.error('Login error:', error);
-      console.error('Login error details:', {
-        message: error.message,
-        response: error.response?.data,
-        status: error.response?.status,
-        url: error.config?.url
-      });
+      console.error('Login failed:', error.message);
 
-      if (error.code === 'ECONNABORTED') {
-        setError('Tiempo de espera agotado. Verifica tu conexión.');
-      } else if (error.response) {
+      if (error.response?.status === 404) {
+        setError('Servidor no disponible. Intenta más tarde.');
+      } else if (error.response?.status === 401) {
         setError(error.response.data?.message || 'Credenciales incorrectas');
-      } else if (error.request) {
-        setError('No se puede conectar al servidor. Intenta más tarde.');
+      } else if (error.code === 'ECONNABORTED') {
+        setError('Tiempo de espera agotado.');
       } else {
-        setError('Error inesperado. Intenta nuevamente.');
+        setError('Error de conexión. Verifica que el servidor esté funcionando.');
       }
     } finally {
       setLoading(false);

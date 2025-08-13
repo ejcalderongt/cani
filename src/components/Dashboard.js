@@ -15,9 +15,9 @@ function Dashboard() {
       try {
         console.log('Fetching dashboard data...');
         
-        // First check if user is authenticated
+        // Check authentication status
         const statusResponse = await axios.get('/api/status');
-        if (!statusResponse.data.session?.enfermero_id) {
+        if (!statusResponse.data.authenticated || !statusResponse.data.session?.enfermero_id) {
           console.log('User not authenticated, redirecting to login');
           navigate('/login');
           return;

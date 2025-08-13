@@ -19,7 +19,7 @@ import CambiarClave from './components/CambiarClave';
 
 // Configure axios defaults
 const setupAxios = () => {
-  // Use relative URLs to avoid port conflicts
+  // Use relative URLs only
   axios.defaults.baseURL = '';
   axios.defaults.withCredentials = true;
   axios.defaults.timeout = 10000;
@@ -27,7 +27,7 @@ const setupAxios = () => {
   // Add request interceptor for debugging
   axios.interceptors.request.use(
     (config) => {
-      console.log('Making request to:', config.url);
+      console.log('API Request:', config.method?.toUpperCase(), config.url);
       return config;
     },
     (error) => {
@@ -40,9 +40,8 @@ const setupAxios = () => {
   axios.interceptors.response.use(
     (response) => response,
     (error) => {
-      console.error('Response error:', error.message);
-      if (error.code === 'ERR_NETWORK') {
-        console.error('Network error - check if backend server is running');
+      if (error.response?.status === 404) {
+        console.error('API endpoint not found:', error.config?.url);
       }
       return Promise.reject(error);
     }
