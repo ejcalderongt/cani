@@ -25,17 +25,8 @@ function Login({ onLogin }) {
     try {
       console.log('Attempting login with:', { codigo: formData.codigo });
 
-      // Use the same axios configuration as App.js
-      const axiosInstance = axios.create({
-        baseURL: window.location.origin,
-        withCredentials: true,
-        timeout: 15000,
-        headers: {
-          'Content-Type': 'application/json',
-        }
-      });
-
-      const response = await axiosInstance.post('/api/login', formData);
+      // Use global axios configuration - no need to create new instance
+      const response = await axios.post('/api/login', formData);
 
       if (response.data.success) {
         if (response.data.requiere_cambio_clave) {
@@ -45,7 +36,7 @@ function Login({ onLogin }) {
         } else {
           // Get complete user session data after login
           try {
-            const sessionResponse = await axiosInstance.get('/api/status');
+            const sessionResponse = await axios.get('/api/status');
             if (sessionResponse.data.session) {
               onLogin(sessionResponse.data.session);
             } else {
