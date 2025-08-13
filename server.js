@@ -316,7 +316,7 @@ async function initDatabase() {
     const existingCodes = existingUsers.rows.map(row => row.codigo);
 
     const defaultUsers = [
-      {codigo: 'admin', clave: 'Admin1965!*', nombre: 'Admin', apellidos: 'Sistema', turno: 'todos', debe_cambiar_clave: false, primer_login: false },
+      {codigo: 'admin', clave: 'admin123', nombre: 'Admin', apellidos: 'Sistema', turno: 'todos', debe_cambiar_clave: false, primer_login: false },
       {codigo: 'erick', clave: 'abc123', nombre: 'Erick', apellidos: 'Usuario', turno: 'mañana', debe_cambiar_clave: true, primer_login: true },
       {codigo: 'cintia', clave: 'abc123', nombre: 'Cintia', apellidos: 'Usuario', turno: 'tarde', debe_cambiar_clave: true, primer_login: true },
       {codigo: 'ENF001', clave: 'abc123', nombre: 'Enfermero', apellidos: 'De Prueba', turno: 'mañana', debe_cambiar_clave: true, primer_login: true }
@@ -334,12 +334,21 @@ async function initDatabase() {
       }
     }
 
-    // Update existing non-admin users to have default password and require change
+    // Update admin password to ensure it works
+    const hashedAdminPassword = await bcrypt.hash('admin123', 10);
     await pool.query(`
       UPDATE enfermeros 
-      SET clave = 'abc123', debe_cambiar_clave = true, primer_login = true 
-      WHERE codigo != 'admin' AND clave != 'abc123'
-    `);
+      SET clave = $1, debe_cambiar_clave = false, primer_login = false 
+      WHERE codigo = 'admin'
+    `, [hashedAdminPassword]);
+
+    // Update existing non-admin users to have default password and require change
+    const hashedDefaultPassword = await bcrypt.hash('abc123', 10);
+    await pool.query(`
+      UPDATE enfermeros 
+      SET clave = $1, debe_cambiar_clave = true, primer_login = true 
+      WHERE codigo != 'admin'
+    `, [hashedDefaultPassword]);
 
     console.log('Database initialized successfully');
   } catch (error) {
