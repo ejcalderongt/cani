@@ -25,14 +25,9 @@ function Login({ onLogin }) {
     try {
       console.log('Attempting login with:', { codigo: formData.codigo });
 
-      // Create axios instance with proper configuration
-      const getBackendURL = () => {
-        // Always use same origin
-        return window.location.origin;
-      };
-
+      // Use the same axios configuration as App.js
       const axiosInstance = axios.create({
-        baseURL: getBackendURL(),
+        baseURL: window.location.origin,
         withCredentials: true,
         timeout: 15000,
         headers: {

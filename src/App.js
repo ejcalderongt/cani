@@ -18,15 +18,9 @@ import ImprimirNotas from './components/ImprimirNotas';
 import CambiarClave from './components/CambiarClave';
 
 // Configure axios defaults
-const getBaseURL = () => {
-  // Always use same origin - this works for both Replit and production
-  return window.location.origin;
-};
-
 const setupAxios = () => {
-  const baseURL = getBaseURL();
-
-  axios.defaults.baseURL = baseURL;
+  // Always use same origin - this works for both Replit and production
+  axios.defaults.baseURL = window.location.origin;
   axios.defaults.withCredentials = true;
   axios.defaults.timeout = 10000;
 
