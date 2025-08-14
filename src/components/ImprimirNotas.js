@@ -8,12 +8,12 @@ function ImprimirNotas() {
   const [notas, setNotas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
+
   // Set default dates: yesterday to today
   const today = new Date();
   const yesterday = new Date(today);
   yesterday.setDate(yesterday.getDate() - 1);
-  
+
   const [fechaInicio, setFechaInicio] = useState(yesterday.toISOString().split('T')[0]);
   const [fechaFin, setFechaFin] = useState(today.toISOString().split('T')[0]);
   const [formatoImpresion, setFormatoImpresion] = useState('con-lineas'); // 'con-lineas' o 'simplificado'
@@ -67,8 +67,8 @@ function ImprimirNotas() {
 
     // Crear una nueva ventana para imprimir
     const printWindow = window.open('', '_blank');
-    const printContent = formatoImpresion === 'con-lineas' 
-      ? generatePrintHTML(paciente, notas) 
+    const printContent = formatoImpresion === 'con-lineas'
+      ? generatePrintHTML(paciente, notas)
       : generateSimplifiedPrintHTML(paciente, notas);
 
     printWindow.document.write(printContent);
@@ -91,13 +91,38 @@ function ImprimirNotas() {
 
     // Formatear cada nota con su fecha y hora específica
     const notasFormateadas = notas.map(nota => {
-      const fechaObj = new Date(nota.fecha + 'T' + nota.hora);
-      const fechaFormateada = fechaObj.toLocaleDateString('es-ES', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
-      const horaFormateada = nota.hora.substring(0, 5); // HH:MM
+      // Fix date parsing - ensure proper format
+      let fechaFormateada, horaFormateada;
+
+      try {
+        // Handle different date formats
+        let fechaToProcess = nota.fecha;
+        if (fechaToProcess.includes('T')) {
+          fechaToProcess = fechaToProcess.split('T')[0];
+        }
+
+        const fechaParts = fechaToProcess.split('-');
+        if (fechaParts.length === 3) {
+          const year = parseInt(fechaParts[0]);
+          const month = parseInt(fechaParts[1]) - 1; // Month is 0-indexed
+          const day = parseInt(fechaParts[2]);
+          const fechaObj = new Date(year, month, day);
+
+          fechaFormateada = fechaObj.toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          });
+        } else {
+          fechaFormateada = nota.fecha;
+        }
+      } catch (error) {
+        console.error('Error formatting date:', error);
+        fechaFormateada = nota.fecha;
+      }
+
+      // Format time
+      horaFormateada = nota.hora ? nota.hora.substring(0, 5) : '00:00';
 
       return {
         ...nota,
@@ -105,9 +130,13 @@ function ImprimirNotas() {
         horaFormateada
       };
     }).sort((a, b) => {
-      const fechaA = new Date(a.fecha + 'T' + a.hora);
-      const fechaB = new Date(b.fecha + 'T' + b.hora);
-      return fechaA - fechaB;
+      try {
+        const fechaA = new Date(a.fecha + 'T' + (a.hora || '00:00'));
+        const fechaB = new Date(b.fecha + 'T' + (b.hora || '00:00'));
+        return fechaA - fechaB;
+      } catch (error) {
+        return 0;
+      }
     });
 
     return `
@@ -426,13 +455,38 @@ function ImprimirNotas() {
 
     // Formatear cada nota con su fecha y hora específica
     const notasFormateadas = notas.map(nota => {
-      const fechaObj = new Date(nota.fecha + 'T' + nota.hora);
-      const fechaFormateada = fechaObj.toLocaleDateString('es-ES', {
-        day: '2-digit',
-        month: '2-digit',
-        year: 'numeric'
-      });
-      const horaFormateada = nota.hora.substring(0, 5); // HH:MM
+      // Fix date parsing - ensure proper format
+      let fechaFormateada, horaFormateada;
+
+      try {
+        // Handle different date formats
+        let fechaToProcess = nota.fecha;
+        if (fechaToProcess.includes('T')) {
+          fechaToProcess = fechaToProcess.split('T')[0];
+        }
+
+        const fechaParts = fechaToProcess.split('-');
+        if (fechaParts.length === 3) {
+          const year = parseInt(fechaParts[0]);
+          const month = parseInt(fechaParts[1]) - 1; // Month is 0-indexed
+          const day = parseInt(fechaParts[2]);
+          const fechaObj = new Date(year, month, day);
+
+          fechaFormateada = fechaObj.toLocaleDateString('es-ES', {
+            day: '2-digit',
+            month: '2-digit',
+            year: 'numeric'
+          });
+        } else {
+          fechaFormateada = nota.fecha;
+        }
+      } catch (error) {
+        console.error('Error formatting date:', error);
+        fechaFormateada = nota.fecha;
+      }
+
+      // Format time
+      horaFormateada = nota.hora ? nota.hora.substring(0, 5) : '00:00';
 
       return {
         ...nota,
@@ -440,9 +494,13 @@ function ImprimirNotas() {
         horaFormateada
       };
     }).sort((a, b) => {
-      const fechaA = new Date(a.fecha + 'T' + a.hora);
-      const fechaB = new Date(b.fecha + 'T' + b.hora);
-      return fechaA - fechaB;
+      try {
+        const fechaA = new Date(a.fecha + 'T' + (a.hora || '00:00'));
+        const fechaB = new Date(b.fecha + 'T' + (b.hora || '00:00'));
+        return fechaA - fechaB;
+      } catch (error) {
+        return 0;
+      }
     });
 
     return `
