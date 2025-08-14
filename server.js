@@ -91,6 +91,8 @@ app.use(session({
 async function initDatabase() {
   if (!process.env.DATABASE_URL) {
     console.log('No DATABASE_URL found. Please set up a PostgreSQL database in the Database tab.');
+    console.log('The app will continue to run but database features will not work.');
+    console.log('Go to the Database tab and create a PostgreSQL database to enable full functionality.');
     return;
   }
 
@@ -1326,6 +1328,14 @@ initDatabase().then(() => {
     console.log('If you see 404 errors, make sure you are accessing the app on the correct port.');
   });
 }).catch(error => {
-  console.error('Failed to initialize database:', error);
-  process.exit(1);
+  console.error('Database initialization failed, but server will continue:', error);
+  console.log('Some features may not work without a database. Set up PostgreSQL in the Database tab.');
+  
+  // Start server anyway
+  app.listen(port, '0.0.0.0', () => {
+    console.log(`Hospital System Server running on http://0.0.0.0:${port} (LIMITED MODE - NO DATABASE)`);
+    console.log('To enable full functionality, set up a PostgreSQL database in the Database tab.');
+    console.log('==========================================');
+    console.log('Ready for connections!');
+  });
 });
