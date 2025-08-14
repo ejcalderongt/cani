@@ -486,7 +486,7 @@ function ImprimirNotas() {
                   value={fechaFin}
                   onChange={(e) => setFechaFin(e.target.value)}
                 />
-              </Form.Form.Control>
+              </Form.Group>
             </div>
             <div className="col-md-6 d-flex align-items-end">
               <Button
