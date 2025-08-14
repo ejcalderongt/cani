@@ -111,8 +111,8 @@ function ImprimirNotas() {
           <style>
             body {
               font-family: 'Times New Roman', serif;
-              margin: 15mm;
-              font-size: 11px;
+              margin: 10mm;
+              font-size: 10px;
               line-height: 1.2;
               color: #000;
             }
@@ -126,12 +126,12 @@ function ImprimirNotas() {
             .ruled-lines {
               background-image: repeating-linear-gradient(
                 transparent,
-                transparent 18px,
-                #ccc 18px,
-                #ccc 19px
+                transparent 12px,
+                #eee 12px,
+                #eee 13px
               );
-              min-height: 400px;
-              padding: 5px;
+              min-height: 30px;
+              padding: 2px;
             }
             .header {
               text-align: center;
@@ -316,10 +316,10 @@ function ImprimirNotas() {
             <table style="width: 100%; border-collapse: collapse; border: 2px solid #000;">
               <thead>
                 <tr style="background-color: #f0f0f0; border-bottom: 2px solid #000;">
-                  <th style="border-right: 1px solid #000; padding: 8px; width: 12%; text-align: center;">Fecha</th>
-                  <th style="border-right: 1px solid #000; padding: 8px; width: 8%; text-align: center;">Hora</th>
-                  <th style="border-right: 1px solid #000; padding: 8px; width: 60%; text-align: center;">Observaciones y Cuidados de Enfermería</th>
-                  <th style="padding: 8px; width: 20%; text-align: center;">Nombre y Firma</th>
+                  <th style="border-right: 1px solid #000; padding: 5px; width: 10%; text-align: center; font-size: 10px;">Fecha</th>
+                  <th style="border-right: 1px solid #000; padding: 5px; width: 7%; text-align: center; font-size: 10px;">Hora</th>
+                  <th style="border-right: 1px solid #000; padding: 5px; width: 63%; text-align: center; font-size: 10px;">Observaciones y Cuidados de Enfermería</th>
+                  <th style="padding: 5px; width: 20%; text-align: center; font-size: 10px;">Nombre y Firma</th>
                 </tr>
               </thead>
               <tbody>
@@ -328,57 +328,32 @@ function ImprimirNotas() {
                     const fechaCompleta = nota.fechaFormateada.split(', ')[0]; // dd/MM/yyyy
                     const hora = nota.hora;
 
-                    // Calcular cuántas líneas de "observaciones" caben en una página
-                    // Asumiendo un tamaño de línea y un espaciado
-                    const caracteresPorLinea = 70; // Estimado
-                    const lineasPorPagina = 40;   // Estimado, puede variar según tamaño de fuente y márgenes
-                    const maxObservacionesChars = caracteresPorLinea * lineasPorPagina;
-
-                    // Dividir observaciones en partes si son muy largas
-                    let observacionesHtml = '';
+                    // Limpiar observaciones: máximo 2 enters consecutivos
+                    let observacionesLimpias = '';
                     if (nota.observaciones) {
-                      const observaciones = nota.observaciones.split('\n');
-                      let currentChunk = '';
-                      let pageChunks = [];
-                      let currentPageChars = 0;
-
-                      for (const obsLine of observaciones) {
-                        // Validar espacio para la línea actual + espaciado
-                        const lineLength = obsLine.length + 2; // +2 para simular un enter
-                        if (currentPageChars + lineLength <= maxObservacionesChars) {
-                          currentChunk += (currentChunk ? '<br>' : '') + obsLine.replace(/\s{2,}/g, ' ').trim(); // Simplificar espacios
-                          currentPageChars += lineLength;
-                        } else {
-                          pageChunks.push(`<div class="ruled-lines">${currentChunk}</div>`);
-                          currentChunk = obsLine.replace(/\s{2,}/g, ' ').trim();
-                          currentPageChars = lineLength;
-                        }
-                      }
-                      if (currentChunk) {
-                        pageChunks.push(`<div class="ruled-lines">${currentChunk}</div>`);
-                      }
-                      observacionesHtml = pageChunks.join('<div style="page-break-before: auto;"></div>'); // Añadir salto de página si es necesario
+                      observacionesLimpias = nota.observaciones
+                        .replace(/\n{3,}/g, '\n\n')  // Máximo 2 enters
+                        .replace(/\s{2,}/g, ' ')     // Simplificar espacios múltiples
+                        .trim();
                     }
 
-
                     return `
-                      <tr style="border-bottom: 1px solid #000; min-height: 80px;">
-                        <td style="border-right: 1px solid #000; padding: 8px; vertical-align: top; text-align: center;">
+                      <tr style="border-bottom: 1px solid #000;">
+                        <td style="border-right: 1px solid #000; padding: 5px; vertical-align: top; text-align: center; font-size: 9px;">
                           ${index === 0 ? fechaCompleta : ''}
                         </td>
-                        <td style="border-right: 1px solid #000; padding: 8px; vertical-align: top; text-align: center;">
+                        <td style="border-right: 1px solid #000; padding: 5px; vertical-align: top; text-align: center; font-size: 9px;">
                           ${hora}
                         </td>
-                        <td style="border-right: 1px solid #000; padding: 8px; vertical-align: top;">
-                          <strong>OBSERVACIONES:</strong><br>
-                          ${observacionesHtml}
+                        <td style="border-right: 1px solid #000; padding: 5px; vertical-align: top; font-size: 9px; line-height: 1.3;">
+                          ${observacionesLimpias.replace(/\n/g, '<br>')}
                         </td>
-                        <td style="padding: 8px; vertical-align: top; text-align: center;">
-                          <div style="height: 60px; display: flex; flex-direction: column; justify-content: space-between;">
-                            <div style="font-size: 10px;">
+                        <td style="padding: 5px; vertical-align: top; text-align: center; font-size: 8px;">
+                          <div style="min-height: 30px;">
+                            <div style="margin-bottom: 20px;">
                               ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
                             </div>
-                            <div style="border-top: 1px solid #000; margin-top: 40px; padding-top: 2px; font-size: 8px;">
+                            <div style="border-top: 1px solid #000; padding-top: 2px;">
                               Firma
                             </div>
                           </div>
@@ -388,15 +363,13 @@ function ImprimirNotas() {
                   }).join('')
                 ).join('')}
 
-                <!-- Líneas vacías para completar la hoja -->
-                ${Array(Math.max(5 - Object.values(notasPorFecha).reduce((sum, arr) => sum + arr.length, 0), 0)).fill().map(() => `
-                  <tr style="border-bottom: 1px solid #000; height: 80px;">
-                    <td style="border-right: 1px solid #000; padding: 8px;"></td>
-                    <td style="border-right: 1px solid #000; padding: 8px;"></td>
-                    <td style="border-right: 1px solid #000; padding: 8px;">
-                      <div class="ruled-lines"></div>
-                    </td>
-                    <td style="padding: 8px;"></td>
+                <!-- Líneas adicionales para llenar la página si es necesario -->
+                ${Array(Math.max(15 - Object.values(notasPorFecha).reduce((sum, arr) => sum + arr.length, 0), 0)).fill().map(() => `
+                  <tr style="border-bottom: 1px solid #000; height: 40px;">
+                    <td style="border-right: 1px solid #000; padding: 5px;"></td>
+                    <td style="border-right: 1px solid #000; padding: 5px;"></td>
+                    <td style="border-right: 1px solid #000; padding: 5px; background-image: repeating-linear-gradient(transparent, transparent 12px, #eee 12px, #eee 13px);"></td>
+                    <td style="padding: 5px;"></td>
                   </tr>
                 `).join('')}
               </tbody>
