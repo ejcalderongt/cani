@@ -758,8 +758,7 @@ function ImprimirNotas() {
                 </div>
               </div>
             </div>
-          )}</div>
-          </div>
+          )}
         </Card.Body>
       </Card>
 
