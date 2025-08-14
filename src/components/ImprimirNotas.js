@@ -8,8 +8,14 @@ function ImprimirNotas() {
   const [notas, setNotas] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [fechaInicio, setFechaInicio] = useState('');
-  const [fechaFin, setFechaFin] = useState('');
+  
+  // Set default dates: yesterday to today
+  const today = new Date();
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  
+  const [fechaInicio, setFechaInicio] = useState(yesterday.toISOString().split('T')[0]);
+  const [fechaFin, setFechaFin] = useState(today.toISOString().split('T')[0]);
 
   useEffect(() => {
     fetchPacientes();
@@ -256,7 +262,10 @@ function ImprimirNotas() {
             </div>
             <div class="info-row">
               <span class="info-label">Fecha de Nacimiento:</span>
-              <span>${paciente?.fecha_nacimiento ? new Date(paciente.fecha_nacimiento).toLocaleDateString('es-ES') : 'N/A'}</span>
+              <span>${paciente?.fecha_nacimiento ? (() => {
+                const fecha = new Date(paciente.fecha_nacimiento + 'T00:00:00');
+                return fecha.toLocaleDateString('es-ES');
+              })() : 'N/A'}</span>
             </div>
             <div class="info-row">
               <span class="info-label">Tipo de Sangre:</span>
