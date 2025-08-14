@@ -91,38 +91,65 @@ function ImprimirNotas() {
 
     // Formatear cada nota con su fecha y hora específica
     const notasFormateadas = notas.map(nota => {
-      // Fix date parsing - ensure proper format
       let fechaFormateada, horaFormateada;
 
       try {
-        // Handle different date formats
+        // Handle different date formats more robustly
         let fechaToProcess = nota.fecha;
-        if (fechaToProcess.includes('T')) {
+
+        // Remove time part if present
+        if (fechaToProcess && fechaToProcess.includes('T')) {
           fechaToProcess = fechaToProcess.split('T')[0];
         }
 
-        const fechaParts = fechaToProcess.split('-');
-        if (fechaParts.length === 3) {
-          const year = parseInt(fechaParts[0]);
-          const month = parseInt(fechaParts[1]) - 1; // Month is 0-indexed
-          const day = parseInt(fechaParts[2]);
-          const fechaObj = new Date(year, month, day);
+        // Validate and parse date
+        if (fechaToProcess && fechaToProcess.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          const fechaParts = fechaToProcess.split('-');
+          const year = parseInt(fechaParts[0], 10);
+          const month = parseInt(fechaParts[1], 10) - 1; // Month is 0-indexed
+          const day = parseInt(fechaParts[2], 10);
 
-          fechaFormateada = fechaObj.toLocaleDateString('es-ES', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-          });
+          // Validate date components
+          if (year > 1900 && year < 2100 && month >= 0 && month < 12 && day >= 1 && day <= 31) {
+            const fechaObj = new Date(year, month, day);
+
+            // Double check the date is valid (handles Feb 30, etc.)
+            if (fechaObj.getFullYear() === year && fechaObj.getMonth() === month && fechaObj.getDate() === day) {
+              fechaFormateada = fechaObj.toLocaleDateString('es-ES', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+              });
+            } else {
+              fechaFormateada = fechaToProcess; // Use original if invalid
+            }
+          } else {
+            fechaFormateada = fechaToProcess; // Use original if out of range
+          }
         } else {
-          fechaFormateada = nota.fecha;
+          // If date doesn't match expected format, try to parse it directly
+          const directParse = new Date(fechaToProcess);
+          if (!isNaN(directParse.getTime())) {
+            fechaFormateada = directParse.toLocaleDateString('es-ES', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric'
+            });
+          } else {
+            fechaFormateada = fechaToProcess || 'Fecha no válida';
+          }
         }
       } catch (error) {
         console.error('Error formatting date:', error);
-        fechaFormateada = nota.fecha;
+        fechaFormateada = nota.fecha || 'Fecha no válida';
       }
 
       // Format time
-      horaFormateada = nota.hora ? nota.hora.substring(0, 5) : '00:00';
+      try {
+        horaFormateada = nota.hora ? nota.hora.substring(0, 5) : '00:00';
+      } catch (error) {
+        horaFormateada = '00:00';
+      }
 
       return {
         ...nota,
@@ -455,38 +482,65 @@ function ImprimirNotas() {
 
     // Formatear cada nota con su fecha y hora específica
     const notasFormateadas = notas.map(nota => {
-      // Fix date parsing - ensure proper format
       let fechaFormateada, horaFormateada;
 
       try {
-        // Handle different date formats
+        // Handle different date formats more robustly
         let fechaToProcess = nota.fecha;
-        if (fechaToProcess.includes('T')) {
+
+        // Remove time part if present
+        if (fechaToProcess && fechaToProcess.includes('T')) {
           fechaToProcess = fechaToProcess.split('T')[0];
         }
 
-        const fechaParts = fechaToProcess.split('-');
-        if (fechaParts.length === 3) {
-          const year = parseInt(fechaParts[0]);
-          const month = parseInt(fechaParts[1]) - 1; // Month is 0-indexed
-          const day = parseInt(fechaParts[2]);
-          const fechaObj = new Date(year, month, day);
+        // Validate and parse date
+        if (fechaToProcess && fechaToProcess.match(/^\d{4}-\d{2}-\d{2}$/)) {
+          const fechaParts = fechaToProcess.split('-');
+          const year = parseInt(fechaParts[0], 10);
+          const month = parseInt(fechaParts[1], 10) - 1; // Month is 0-indexed
+          const day = parseInt(fechaParts[2], 10);
 
-          fechaFormateada = fechaObj.toLocaleDateString('es-ES', {
-            day: '2-digit',
-            month: '2-digit',
-            year: 'numeric'
-          });
+          // Validate date components
+          if (year > 1900 && year < 2100 && month >= 0 && month < 12 && day >= 1 && day <= 31) {
+            const fechaObj = new Date(year, month, day);
+
+            // Double check the date is valid (handles Feb 30, etc.)
+            if (fechaObj.getFullYear() === year && fechaObj.getMonth() === month && fechaObj.getDate() === day) {
+              fechaFormateada = fechaObj.toLocaleDateString('es-ES', {
+                day: '2-digit',
+                month: '2-digit',
+                year: 'numeric'
+              });
+            } else {
+              fechaFormateada = fechaToProcess; // Use original if invalid
+            }
+          } else {
+            fechaFormateada = fechaToProcess; // Use original if out of range
+          }
         } else {
-          fechaFormateada = nota.fecha;
+          // If date doesn't match expected format, try to parse it directly
+          const directParse = new Date(fechaToProcess);
+          if (!isNaN(directParse.getTime())) {
+            fechaFormateada = directParse.toLocaleDateString('es-ES', {
+              day: '2-digit',
+              month: '2-digit',
+              year: 'numeric'
+            });
+          } else {
+            fechaFormateada = fechaToProcess || 'Fecha no válida';
+          }
         }
       } catch (error) {
         console.error('Error formatting date:', error);
-        fechaFormateada = nota.fecha;
+        fechaFormateada = nota.fecha || 'Fecha no válida';
       }
 
       // Format time
-      horaFormateada = nota.hora ? nota.hora.substring(0, 5) : '00:00';
+      try {
+        horaFormateada = nota.hora ? nota.hora.substring(0, 5) : '00:00';
+      } catch (error) {
+        horaFormateada = '00:00';
+      }
 
       return {
         ...nota,
