@@ -64,6 +64,9 @@ app.use(express.json());
 // Serve static files from the React app build directory
 app.use(express.static(path.join(__dirname, 'build')));
 
+// Add fallback for missing build files
+app.use('/static', express.static(path.join(__dirname, 'build/static')));
+
 // Add logging middleware to debug requests
 app.use((req, res, next) => {
   console.log(`${req.method} ${req.url}`, req.body ? JSON.stringify(req.body) : '');
