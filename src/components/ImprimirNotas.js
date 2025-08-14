@@ -400,10 +400,44 @@ function ImprimirNotas() {
                       .trim();
                   }
 
+                  // Format date for table display
+                  let fechaMostrar = nota.fechaFormateada;
+                  try {
+                    if (nota.fecha) {
+                      let fechaToProcess = nota.fecha;
+                      
+                      // Remove time part if present
+                      if (fechaToProcess && fechaToProcess.includes('T')) {
+                        fechaToProcess = fechaToProcess.split('T')[0];
+                      }
+                      
+                      // Parse date correctly
+                      if (fechaToProcess && fechaToProcess.match(/^\d{4}-\d{2}-\d{2}$/)) {
+                        const fechaParts = fechaToProcess.split('-');
+                        const year = parseInt(fechaParts[0], 10);
+                        const month = parseInt(fechaParts[1], 10) - 1;
+                        const day = parseInt(fechaParts[2], 10);
+                        
+                        if (year > 1900 && year < 2100 && month >= 0 && month < 12 && day >= 1 && day <= 31) {
+                          const fechaObj = new Date(year, month, day);
+                          if (fechaObj.getFullYear() === year && fechaObj.getMonth() === month && fechaObj.getDate() === day) {
+                            fechaMostrar = fechaObj.toLocaleDateString('es-ES', {
+                              day: '2-digit',
+                              month: '2-digit',
+                              year: 'numeric'
+                            });
+                          }
+                        }
+                      }
+                    }
+                  } catch (error) {
+                    console.error('Error formatting date for table:', error);
+                  }
+
                   return `
                     <tr style="border-bottom: 1px solid #000;">
                       <td style="border-right: 1px solid #000; padding: 5px; vertical-align: top; text-align: center; font-size: 9px;">
-                        ${nota.fechaFormateada}
+                        ${fechaMostrar}
                       </td>
                       <td style="border-right: 1px solid #000; padding: 5px; vertical-align: top; text-align: center; font-size: 9px;">
                         ${nota.horaFormateada}
