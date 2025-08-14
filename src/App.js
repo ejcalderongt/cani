@@ -22,6 +22,11 @@ import NotasActuales from './components/NotasActuales'; // Assuming NotasActuale
 axios.defaults.withCredentials = true;
 axios.defaults.timeout = 10000;
 
+// Determinar la URL base de la API
+const API_BASE_URL = process.env.NODE_ENV === 'production' 
+  ? window.location.origin 
+  : window.location.origin;
+
 function App() {
   const [enfermero, setEnfermero] = useState(null);
   const [loading, setLoading] = useState(true);

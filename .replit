@@ -409,6 +409,31 @@ args = "npm run build"
 task = "shell.exec"
 args = "node server.js"
 
+[[workflows.workflow]]
+name = "Production Deploy"
+author = 44594929
+mode = "sequential"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pkill -f \"node\" || true"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "sleep 3"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm install --production"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "npm run build"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "NODE_ENV=production PORT=80 node server.js"
+
 [[ports]]
 localPort = 3000
 externalPort = 3000
@@ -427,4 +452,5 @@ externalPort = 3002
 
 [deployment]
 deploymentTarget = "cloudrun"
-run = ["sh", "-c", "node server.js"]
+run = ["sh", "-c", "NODE_ENV=production PORT=80 node server.js"]
+build = ["sh", "-c", "npm run build"]

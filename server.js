@@ -7,7 +7,7 @@ const path = require('path');
 const bcrypt = require('bcryptjs');
 
 const app = express();
-const port = process.env.PORT || 5000;
+const port = process.env.PORT || (process.env.NODE_ENV === 'production' ? 80 : 5000);
 
 console.log(`Starting server on port ${port}`);
 
@@ -23,34 +23,51 @@ app.use(cors({
     // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
 
-    // Allow all Replit domains and localhost for development
-    const allowedOrigins = [
-      'http://localhost:3000',
-      'http://localhost:3001',
-      'http://localhost:5000',
-      'http://localhost:5001',
-      /https:\/\/.*\.replit\.dev$/,
-      /https:\/\/.*\.replit\.dev:\d+$/,
-      /https:\/\/.*\.repl\.co$/,
-      /https:\/\/.*\.repl\.co:\d+$/,
-      /https:\/\/.*\.replit\.app$/,
-      /https:\/\/.*\.replit\.app:\d+$/
-    ];
+    // In production, be more restrictive
+    if (process.env.NODE_ENV === 'production') {
+      const allowedOrigins = [
+        /https:\/\/.*\.replit\.dev$/,
+        /https:\/\/.*\.repl\.co$/,
+        /https:\/\/.*\.replit\.app$/
+      ];
+      
+      const isAllowed = allowedOrigins.some(pattern => pattern.test(origin));
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        console.log('CORS blocked origin in production:', origin);
+        callback(new Error('Not allowed by CORS'));
+      }
+    } else {
+      // Development - allow localhost
+      const allowedOrigins = [
+        'http://localhost:3000',
+        'http://localhost:3001',
+        'http://localhost:5000',
+        'http://localhost:5001',
+        /https:\/\/.*\.replit\.dev$/,
+        /https:\/\/.*\.replit\.dev:\d+$/,
+        /https:\/\/.*\.repl\.co$/,
+        /https:\/\/.*\.repl\.co:\d+$/,
+        /https:\/\/.*\.replit\.app$/,
+        /https:\/\/.*\.replit\.app:\d+$/
+      ];
 
     // Check if origin matches any allowed pattern
-    const isAllowed = allowedOrigins.some(pattern => {
-      if (typeof pattern === 'string') {
-        return pattern === origin;
-      } else {
-        return pattern.test(origin);
-      }
-    });
+      const isAllowed = allowedOrigins.some(pattern => {
+        if (typeof pattern === 'string') {
+          return pattern === origin;
+        } else {
+          return pattern.test(origin);
+        }
+      });
 
-    if (isAllowed) {
-      callback(null, true);
-    } else {
-      console.log('CORS blocked origin:', origin);
-      callback(new Error('Not allowed by CORS'));
+      if (isAllowed) {
+        callback(null, true);
+      } else {
+        console.log('CORS blocked origin:', origin);
+        callback(new Error('Not allowed by CORS'));
+      }
     }
   },
   credentials: true,
@@ -1360,7 +1377,9 @@ initDatabase().then(() => {
     console.log(`API endpoints available at: /api/*`);
     console.log('==========================================');
     console.log('Ready for connections!');
-    console.log('If you see 404 errors, make sure you are accessing the app on the correct port.');
+    if (process.env.NODE_ENV === 'production') {
+      console.log('Running in PRODUCTION mode');
+    }
   });
 }).catch(error => {
   console.error('Database initialization failed, but server will continue:', error);
