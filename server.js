@@ -600,33 +600,45 @@ app.get('/api/notas', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(`
       SELECT n.*, 
-             p.nombre as paciente_nombre, p.apellidos as paciente_apellidos, p.numero_expediente,
-             e.nombre as enfermero_nombre, e.apellidos as enfermero_apellidos
+             p.nombre as paciente_nombre, 
+             p.apellidos as paciente_apellidos,
+             p.numero_expediente as paciente_expediente,
+             u.nombre as enfermero_nombre, 
+             u.apellidos as enfermero_apellidos
       FROM notas_enfermeria n
       JOIN pacientes p ON n.paciente_id = p.id
-      JOIN enfermeros e ON n.enfermero_id = e.id
+      JOIN enfermeros u ON n.enfermero_id = u.id
       ORDER BY n.fecha DESC, n.hora DESC
     `);
     res.json(result.rows);
   } catch (error) {
-    console.error('Error fetching notas:', error);
+    console.error('Error fetching nursing notes:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 
 app.post('/api/notas', requireAuth, async (req, res) => {
   try {
-    const { fecha, hora, paciente_id, observaciones, medicamentos_administrados, tratamientos } = req.body;
+    const {
+      fecha,
+      hora,
+      paciente_id,
+      observaciones
+    } = req.body;
+
+    // Validar que las observaciones no tengan más de 2 enters consecutivos
+    const observacionesLimpias = observaciones.replace(/\n{3,}/g, '\n\n');
 
     const result = await pool.query(`
-      INSERT INTO notas_enfermeria (fecha, hora, paciente_id, enfermero_id, observaciones, medicamentos_administrados, tratamientos)
-      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      INSERT INTO notas_enfermeria (
+        fecha, hora, paciente_id, enfermero_id, observaciones
+      ) VALUES ($1, $2, $3, $4, $5)
       RETURNING *
-    `, [fecha, hora, paciente_id, req.session.enfermero_id, observaciones, medicamentos_administrados, tratamientos]);
+    `, [fecha, hora, paciente_id, req.session.enfermero_id, observacionesLimpias]);
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error('Error creating nota:', error);
+    console.error('Error creating nursing note:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
@@ -1072,14 +1084,14 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
       'Paciente en proceso de rehabilitación', 'interno', 'HAB-101',
       'Masculino', '2025-01-10 08:30:00', 'desintoxicacion', 'fase_1', 'Cama A',
       'Dr. Roberto Martínez', 'Equipo Alpha', false, false, true, false,
-      
+
       'EXP002', 'Ana Sofía', 'López Hernández', '1992-07-22', '001-220792-2034M',
       'Nicaragüense', 'Pedro López', '8555-4321', '8444-8765', '8333-2109',
       'A-', 62.0, 1.62, 'Trastorno depresivo mayor con episodios psicóticos',
       'Paciente con historial de autolesiones', 'interno', 'HAB-205',
       'Femenino', '2025-01-08 14:15:00', 'crisis_psiquiatrica', 'fase_2', 'Cama B',
       'Dra. Carmen Silva', 'Equipo Beta', true, false, false, true,
-      
+
       'EXP003', 'Miguel Ángel', 'Ruiz Medina', '1978-11-08', '001-081178-3045N',
       'Nicaragüense', 'Elena Ruiz', '8222-6789', '8111-3456', '8000-7890',
       'B+', 82.3, 1.80, 'Alcoholismo crónico con cirrosis inicial',
@@ -1091,7 +1103,7 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
     // Get patient IDs for the notes
     const pacientesResult = await pool.query('SELECT id, numero_expediente FROM pacientes WHERE numero_expediente IN ($1, $2, $3)', 
       ['EXP001', 'EXP002', 'EXP003']);
-    
+
     const pacientes = {};
     pacientesResult.rows.forEach(p => {
       pacientes[p.numero_expediente] = p.id;
@@ -1115,27 +1127,27 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
       'Paciente despertó tranquilo. Signos vitales estables. Refiere haber dormido bien durante la noche. Se muestra colaborador con el personal. Presenta buen estado de ánimo. Solicita hablar con su familia.',
       'Lorazepam 2mg vía oral - Administrado a las 06:00 hrs según indicación médica. Omeprazol 20mg vía oral en ayunas.',
       'Terapia grupal programada para las 10:00 hrs. Ejercicios de relajación y respiración. Control de signos vitales cada 4 horas.',
-      
+
       '2025-01-15', '14:30', pacientes['EXP001'], 3,
       'Durante la tarde el paciente participó activamente en la terapia grupal. Mostró buena disposición para compartir sus experiencias. Come adecuadamente. No presenta náuseas ni vómitos. Hidratación oral adecuada.',
       'Vitamina B1 100mg IM - Aplicada en glúteo derecho. Multivitamínico 1 tableta vía oral después del almuerzo.',
       'Continúa con plan de desintoxicación. Próxima evaluación médica programada para mañana. Monitoreo estrecho de síntomas de abstinencia.',
-      
+
       '2025-01-15', '22:00', pacientes['EXP001'], 2,
       'Turno nocturno tranquilo. Paciente cena completamente. Ve televisión en sala común hasta las 21:00 hrs. Se retira a su habitación sin dificultad. Refiere sentirse ansioso pero controlado.',
       'Lorazepam 1mg vía oral a las 21:30 hrs para ansiedad nocturna según protocolo.',
       'Técnicas de relajación aplicadas antes de dormir. Ambiente tranquilo mantenido en habitación. Rondas de supervisión cada 2 horas durante la noche.',
-      
+
       '2025-01-15', '09:15', pacientes['EXP002'], 3,
       'Paciente presenta episodio de llanto al despertar. Refiere pesadillas recurrentes. Signos vitales: TA 110/70, FC 88, FR 18, Temp 36.8°C. Acepta desayuno parcialmente. Se muestra retraída al contacto social.',
       'Sertralina 50mg vía oral después del desayuno. Risperidona 2mg vía oral según indicación psiquiátrica.',
       'Sesión individual con psicólogo programada. Observación estrecha por riesgo suicida. Retiro de objetos potencialmente peligrosos de la habitación.',
-      
+
       '2025-01-15', '16:45', pacientes['EXP002'], 2,
       'Mejoría notable después de sesión terapéutica. Paciente más comunicativa y participativa. Realizó actividades de arte-terapia. Buen apetito durante la merienda. Interactúa positivamente con otras pacientes.',
       'Lorazepam 0.5mg vía oral por ansiedad residual a las 15:30 hrs.',
       'Continúa en observación por riesgo suicida nivel medio. Actividades recreativas supervisadas. Llamada telefónica con familiar autorizada por 10 minutos.',
-      
+
       '2025-01-16', '08:30', pacientes['EXP003'], 4,
       'Paciente acude puntual a cita de seguimiento. Refiere adherencia al tratamiento ambulatorio. Examina físico sin hallazgos significativos. Laboratorios pendientes de resultado. Peso estable.',
       'No medicamentos administrados durante la consulta. Receta renovada para tratamiento domiciliar.',
@@ -1287,7 +1299,7 @@ app.get('*', (req, res) => {
 
   // Log non-API requests
   console.log(`Serving React app for: ${req.path}`);
-  
+
   // Serve React build files
   const indexPath = path.join(__dirname, 'build', 'index.html');
   res.sendFile(indexPath, (err) => {

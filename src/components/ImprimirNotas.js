@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Container, Card, Button, Form, Alert, Table } from 'react-bootstrap';
 import axios from 'axios';
@@ -27,14 +26,14 @@ function ImprimirNotas() {
 
   const fetchNotasPaciente = async () => {
     if (!selectedPaciente) return;
-    
+
     setLoading(true);
     setError('');
-    
+
     try {
       const response = await axios.get(`/api/pacientes/${selectedPaciente}`);
       let notasFiltradas = response.data.notas;
-      
+
       // Filtrar por fechas si se especifican
       if (fechaInicio) {
         notasFiltradas = notasFiltradas.filter(nota => nota.fecha >= fechaInicio);
@@ -42,7 +41,7 @@ function ImprimirNotas() {
       if (fechaFin) {
         notasFiltradas = notasFiltradas.filter(nota => nota.fecha <= fechaFin);
       }
-      
+
       setNotas(notasFiltradas);
     } catch (error) {
       setError('Error al cargar notas del paciente');
@@ -58,14 +57,14 @@ function ImprimirNotas() {
     }
 
     const paciente = pacientes.find(p => p.id === parseInt(selectedPaciente));
-    
+
     // Crear una nueva ventana para imprimir
     const printWindow = window.open('', '_blank');
     const printContent = generatePrintHTML(paciente, notas);
-    
+
     printWindow.document.write(printContent);
     printWindow.document.close();
-    
+
     // Esperar a que se cargue el contenido y luego imprimir
     printWindow.onload = () => {
       printWindow.print();
@@ -83,11 +82,23 @@ function ImprimirNotas() {
 
     // Agrupar notas por fecha para mejor organización
     const notasPorFecha = notas.reduce((acc, nota) => {
-      const fecha = nota.fecha;
-      if (!acc[fecha]) {
-        acc[fecha] = [];
+      // Simplificar formato de fecha a dd/MM/yyyy HH:mm
+      const fechaFormateada = new Date(nota.fecha).toLocaleDateString('es-ES', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit'
+      }).replace(/(\d+)\/(\d+)\/(\d+)/, '$3/$2/$1'); // Reordenar a yyyy/MM/dd
+
+      const [datePart, timePart] = fechaFormateada.split(', ');
+      const [day, month, year] = datePart.split('/');
+      const fechaKey = `${year}-${month}-${day}`; // Usar formato YYYY-MM-DD para la clave
+
+      if (!acc[fechaKey]) {
+        acc[fechaKey] = [];
       }
-      acc[fecha].push(nota);
+      acc[fechaKey].push({ ...nota, fechaFormateada: fechaFormateada, hora: timePart.split(':')[0] + ':' + timePart.split(':')[1] });
       return acc;
     }, {});
 
@@ -312,39 +323,73 @@ function ImprimirNotas() {
                 </tr>
               </thead>
               <tbody>
-                ${Object.keys(notasPorFecha).sort().map(fecha => 
-                  notasPorFecha[fecha].map((nota, index) => `
-                    <tr style="border-bottom: 1px solid #000; min-height: 80px;">
-                      <td style="border-right: 1px solid #000; padding: 8px; vertical-align: top; text-align: center;">
-                        ${index === 0 ? fecha.split('-').reverse().join('/') : ''}
-                      </td>
-                      <td style="border-right: 1px solid #000; padding: 8px; vertical-align: top; text-align: center;">
-                        ${nota.hora}
-                      </td>
-                      <td style="border-right: 1px solid #000; padding: 8px; vertical-align: top;">
-                        <div class="ruled-lines">
+                ${Object.keys(notasPorFecha).sort().map(fechaKey =>
+                  notasPorFecha[fechaKey].map((nota, index) => {
+                    const fechaCompleta = nota.fechaFormateada.split(', ')[0]; // dd/MM/yyyy
+                    const hora = nota.hora;
+
+                    // Calcular cuántas líneas de "observaciones" caben en una página
+                    // Asumiendo un tamaño de línea y un espaciado
+                    const caracteresPorLinea = 70; // Estimado
+                    const lineasPorPagina = 40;   // Estimado, puede variar según tamaño de fuente y márgenes
+                    const maxObservacionesChars = caracteresPorLinea * lineasPorPagina;
+
+                    // Dividir observaciones en partes si son muy largas
+                    let observacionesHtml = '';
+                    if (nota.observaciones) {
+                      const observaciones = nota.observaciones.split('\n');
+                      let currentChunk = '';
+                      let pageChunks = [];
+                      let currentPageChars = 0;
+
+                      for (const obsLine of observaciones) {
+                        // Validar espacio para la línea actual + espaciado
+                        const lineLength = obsLine.length + 2; // +2 para simular un enter
+                        if (currentPageChars + lineLength <= maxObservacionesChars) {
+                          currentChunk += (currentChunk ? '<br>' : '') + obsLine.replace(/\s{2,}/g, ' ').trim(); // Simplificar espacios
+                          currentPageChars += lineLength;
+                        } else {
+                          pageChunks.push(`<div class="ruled-lines">${currentChunk}</div>`);
+                          currentChunk = obsLine.replace(/\s{2,}/g, ' ').trim();
+                          currentPageChars = lineLength;
+                        }
+                      }
+                      if (currentChunk) {
+                        pageChunks.push(`<div class="ruled-lines">${currentChunk}</div>`);
+                      }
+                      observacionesHtml = pageChunks.join('<div style="page-break-before: auto;"></div>'); // Añadir salto de página si es necesario
+                    }
+
+
+                    return `
+                      <tr style="border-bottom: 1px solid #000; min-height: 80px;">
+                        <td style="border-right: 1px solid #000; padding: 8px; vertical-align: top; text-align: center;">
+                          ${index === 0 ? fechaCompleta : ''}
+                        </td>
+                        <td style="border-right: 1px solid #000; padding: 8px; vertical-align: top; text-align: center;">
+                          ${hora}
+                        </td>
+                        <td style="border-right: 1px solid #000; padding: 8px; vertical-align: top;">
                           <strong>OBSERVACIONES:</strong><br>
-                          ${nota.observaciones || ''}<br><br>
-                          ${nota.medicamentos_administrados ? `<strong>MEDICAMENTOS:</strong><br>${nota.medicamentos_administrados}<br><br>` : ''}
-                          ${nota.tratamientos ? `<strong>TRATAMIENTOS:</strong><br>${nota.tratamientos}<br>` : ''}
-                        </div>
-                      </td>
-                      <td style="padding: 8px; vertical-align: top; text-align: center;">
-                        <div style="height: 60px; display: flex; flex-direction: column; justify-content: space-between;">
-                          <div style="font-size: 10px;">
-                            ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
+                          ${observacionesHtml}
+                        </td>
+                        <td style="padding: 8px; vertical-align: top; text-align: center;">
+                          <div style="height: 60px; display: flex; flex-direction: column; justify-content: space-between;">
+                            <div style="font-size: 10px;">
+                              ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
+                            </div>
+                            <div style="border-top: 1px solid #000; margin-top: 40px; padding-top: 2px; font-size: 8px;">
+                              Firma
+                            </div>
                           </div>
-                          <div style="border-top: 1px solid #000; margin-top: 40px; padding-top: 2px; font-size: 8px;">
-                            Firma
-                          </div>
-                        </div>
-                      </td>
-                    </tr>
-                  `).join('')
+                        </td>
+                      </tr>
+                    `;
+                  }).join('')
                 ).join('')}
-                
+
                 <!-- Líneas vacías para completar la hoja -->
-                ${Array(Math.max(10 - notas.length, 0)).fill().map(() => `
+                ${Array(Math.max(5 - Object.values(notasPorFecha).reduce((sum, arr) => sum + arr.length, 0), 0)).fill().map(() => `
                   <tr style="border-bottom: 1px solid #000; height: 80px;">
                     <td style="border-right: 1px solid #000; padding: 8px;"></td>
                     <td style="border-right: 1px solid #000; padding: 8px;"></td>
@@ -362,14 +407,14 @@ function ImprimirNotas() {
             <div style="text-align: center; margin-bottom: 10px;">
               <small><strong>TODA NOTA DEBE INCLUIR:</strong> Nombre y apellido del profesional, así como la firma y código</small>
             </div>
-            
+
             <div style="border-top: 1px solid #000; padding-top: 10px;">
               <div class="row" style="display: flex; justify-content: space-between;">
                 <div style="width: 30%; text-align: center;">
                   <p><strong>Total de registros:</strong> ${notas.length}</p>
                   <p><strong>Período:</strong><br>${fechaInicio || 'Inicio'} al ${fechaFin || new Date().toISOString().split('T')[0]}</p>
                 </div>
-                
+
                 <div style="width: 65%; display: flex; flex-wrap: wrap; gap: 20px;">
                   ${[...new Set(notas.map(nota => nota.enfermero_nombre + ' ' + nota.enfermero_apellidos))].map(enfermero => `
                     <div style="text-align: center; min-width: 150px;">
@@ -380,7 +425,7 @@ function ImprimirNotas() {
                 </div>
               </div>
             </div>
-            
+
             <div style="text-align: center; font-size: 8px; color: #666; margin-top: 20px; border-top: 1px solid #ccc; padding-top: 5px;">
               Documento generado automáticamente el ${fechaImpresion}<br>
               Sistema Hospitalario - Notas de Enfermería con carácter legal
@@ -421,7 +466,7 @@ function ImprimirNotas() {
               </Form.Group>
             </div>
           </div>
-          
+
           <div className="row">
             <div className="col-md-3">
               <Form.Group className="mb-3">
@@ -441,7 +486,7 @@ function ImprimirNotas() {
                   value={fechaFin}
                   onChange={(e) => setFechaFin(e.target.value)}
                 />
-              </Form.Group>
+              </Form.Form.Control>
             </div>
             <div className="col-md-6 d-flex align-items-end">
               <Button
@@ -474,7 +519,7 @@ function ImprimirNotas() {
               {notas.map((nota, index) => (
                 <div key={index} className="border rounded p-3 mb-3">
                   <div className="d-flex justify-content-between align-items-center mb-2">
-                    <strong>{nota.fecha} - {nota.hora}</strong>
+                    <strong>{new Date(nota.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })} - {nota.hora.substring(0, 5)}</strong>
                     <small className="text-muted">
                       {nota.enfermero_nombre} {nota.enfermero_apellidos}
                     </small>

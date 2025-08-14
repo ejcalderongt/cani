@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Container, Card, Form, Button, Alert, ProgressBar } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
@@ -9,9 +10,7 @@ function NuevaNota() {
     fecha: new Date().toISOString().split('T')[0],
     hora: new Date().toTimeString().split(' ')[0].substring(0, 5),
     paciente_id: '',
-    observaciones: '',
-    medicamentos_administrados: '',
-    tratamientos: ''
+    observaciones: ''
   });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -20,9 +19,9 @@ function NuevaNota() {
   const [caracteresUsados, setCaracteresUsados] = useState(0);
   const navigate = useNavigate();
 
-  // Configuración para estimación de página llena
-  const CARACTERES_POR_HOJA = 2500; // Estimación basada en formulario legal
-  const LINEAS_POR_HOJA = 35; // Aproximadamente 35 líneas por hoja legal
+  // Configuración para hoja legal estándar
+  const CARACTERES_POR_HOJA = 2000; // Ajustado para solo observaciones
+  const MAX_ENTERS_CONSECUTIVOS = 2;
 
   useEffect(() => {
     const fetchPacientes = async () => {
@@ -45,14 +44,10 @@ function NuevaNota() {
   }, [formData.paciente_id]);
 
   useEffect(() => {
-    // Calcular caracteres totales incluyendo la nota actual
-    const caracteresNota = formData.observaciones.length +
-                          formData.medicamentos_administrados.length +
-                          formData.tratamientos.length;
-
-    const caracteresTotales = caracteresUsados + caracteresNota;
+    // Calcular caracteres de la nota actual
+    const caracteresTotales = caracteresUsados + formData.observaciones.length;
     setCaracteresUsados(caracteresTotales);
-  }, [formData.observaciones, formData.medicamentos_administrados, formData.tratamientos]);
+  }, [formData.observaciones]);
 
   const fetchNotasPaciente = async () => {
     try {
@@ -65,9 +60,7 @@ function NuevaNota() {
       const notasHoy = notas.filter(nota => nota.fecha === hoy);
 
       const caracteresHoy = notasHoy.reduce((total, nota) => {
-        return total + (nota.observaciones?.length || 0) +
-               (nota.medicamentos_administrados?.length || 0) +
-               (nota.tratamientos?.length || 0);
+        return total + (nota.observaciones?.length || 0);
       }, 0);
 
       setCaracteresUsados(caracteresHoy);
@@ -81,13 +74,24 @@ function NuevaNota() {
   };
 
   const debeImprimir = () => {
-    return caracteresUsados >= CARACTERES_POR_HOJA * 0.9; // 90% de capacidad
+    return caracteresUsados >= CARACTERES_POR_HOJA * 0.85; // 85% de capacidad
+  };
+
+  const controlarEnters = (texto) => {
+    // Limitar enters consecutivos a máximo 2
+    return texto.replace(/\n{3,}/g, '\n\n');
   };
 
   const handleChange = (e) => {
+    let value = e.target.value;
+    
+    if (e.target.name === 'observaciones') {
+      value = controlarEnters(value);
+    }
+    
     setFormData({
       ...formData,
-      [e.target.name]: e.target.value
+      [e.target.name]: value
     });
   };
 
@@ -97,12 +101,19 @@ function NuevaNota() {
     setError('');
     setSuccess('');
 
+    // Validaciones
+    if (!formData.observaciones.trim()) {
+      setError('Las observaciones son obligatorias');
+      setLoading(false);
+      return;
+    }
+
     try {
       await axios.post('/api/notas', formData);
 
       let successMessage = 'Nota registrada exitosamente';
       if (debeImprimir()) {
-        successMessage += '. ⚠️ ATENCIÓN: La hoja está casi llena. Se recomienda imprimir las notas para cumplir con los requerimientos legales.';
+        successMessage += '. ⚠️ ATENCIÓN: La hoja está al 85% de capacidad. Se recomienda imprimir las notas para cumplir con los requerimientos legales.';
       }
 
       setSuccess(successMessage);
@@ -111,18 +122,16 @@ function NuevaNota() {
       setFormData({
         fecha: new Date().toISOString().split('T')[0],
         hora: new Date().toTimeString().split(' ')[0].substring(0, 5),
-        paciente_id: formData.paciente_id, // Keep selected patient
-        observaciones: '',
-        medicamentos_administrados: '',
-        tratamientos: ''
+        paciente_id: formData.paciente_id, // Mantener paciente seleccionado
+        observaciones: ''
       });
 
-      // Refresh notes count
+      // Actualizar conteo de notas
       if (formData.paciente_id) {
         fetchNotasPaciente();
       }
 
-      // Redirect after success only if not warning about printing
+      // Redireccionar solo si no hay advertencia de impresión
       if (!debeImprimir()) {
         setTimeout(() => {
           navigate('/notas');
@@ -142,26 +151,26 @@ function NuevaNota() {
 
       <Card>
         <Card.Header>
-          <h5>Nueva Nota de Enfermería</h5>
+          <h5>Registro de Observaciones</h5>
         </Card.Header>
         <Card.Body>
           {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
           {success && <Alert variant={debeImprimir() ? "warning" : "success"} dismissible onClose={() => setSuccess('')}>{success}</Alert>}
 
           {formData.paciente_id && (
-            <Card className="mb-3" style={{ backgroundColor: debeImprimir() ? '#fff3cd' : '#d1ecf1' }}>
+            <Card className="mb-3" style={{ backgroundColor: debeImprimir() ? '#fff3cd' : '#e7f3ff' }}>
               <Card.Body className="py-2">
                 <div className="d-flex justify-content-between align-items-center mb-2">
-                  <small><strong>Capacidad de Hoja Legal:</strong></small>
-                  <small>{Math.round(calcularPorcentajeHoja())}% usado</small>
+                  <small><strong>Capacidad de Hoja Legal (solo observaciones):</strong></small>
+                  <small>{Math.round(calcularPorcentajeHoja())}% utilizado</small>
                 </div>
                 <ProgressBar
                   now={calcularPorcentajeHoja()}
-                  variant={calcularPorcentajeHoja() > 90 ? "danger" : calcularPorcentajeHoja() > 70 ? "warning" : "success"}
+                  variant={calcularPorcentajeHoja() > 85 ? "danger" : calcularPorcentajeHoja() > 60 ? "warning" : "success"}
                 />
                 {debeImprimir() && (
                   <Alert variant="warning" className="mt-2 mb-0 py-2">
-                    <small>⚠️ <strong>Hoja casi llena</strong> - Se recomienda imprimir las notas antes de continuar para cumplir con requerimientos legales.</small>
+                    <small>⚠️ <strong>Hoja casi llena</strong> - Se recomienda imprimir las notas antes de continuar.</small>
                   </Alert>
                 )}
                 <div className="text-end mt-2">
@@ -206,7 +215,7 @@ function NuevaNota() {
             </div>
 
             <Form.Group className="mb-3">
-              <Form.Label>Paciente</Form.Label>
+              <Form.Label>Paciente *</Form.Label>
               <Form.Select
                 name="paciente_id"
                 value={formData.paciente_id}
@@ -226,34 +235,18 @@ function NuevaNota() {
               <Form.Label>Observaciones *</Form.Label>
               <Form.Control
                 as="textarea"
-                rows={4}
+                rows={8}
                 name="observaciones"
                 value={formData.observaciones}
                 onChange={handleChange}
                 required
+                placeholder="Registre aquí las observaciones de enfermería. Máximo 2 enters consecutivos entre párrafos."
+                style={{ resize: 'vertical' }}
               />
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Medicamentos Administrados</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                name="medicamentos_administrados"
-                value={formData.medicamentos_administrados}
-                onChange={handleChange}
-              />
-            </Form.Group>
-
-            <Form.Group className="mb-3">
-              <Form.Label>Tratamientos</Form.Label>
-              <Form.Control
-                as="textarea"
-                rows={3}
-                name="tratamientos"
-                value={formData.tratamientos}
-                onChange={handleChange}
-              />
+              <Form.Text className="text-muted">
+                Caracteres: {formData.observaciones.length} | 
+                Máximo 2 enters consecutivos entre observaciones
+              </Form.Text>
             </Form.Group>
 
             <div className="d-flex gap-2">
