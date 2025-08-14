@@ -132,6 +132,13 @@ function Dashboard() {
       color: 'var(--secondary)'
     },
     {
+      title: 'Notas Actuales',
+      description: 'Ver notas por rango de fechas',
+      icon: '📋',
+      path: '/notas-actuales',
+      color: 'var(--info)'
+    },
+    {
       title: 'Medicamentos',
       description: 'Gestionar medicamentos',
       icon: '💊',

@@ -26,7 +26,7 @@ function NuevaNota() {
   useEffect(() => {
     const fetchPacientes = async () => {
       try {
-        const response = await axios.get('/api/pacientes');
+        const response = await axios.get('/api/pacientes?activos_solo=true');
         setPacientes(response.data);
       } catch (error) {
         console.error('Error al cargar pacientes:', error);
@@ -213,20 +213,25 @@ function NuevaNota() {
             </div>
 
             <Form.Group className="mb-3">
-              <Form.Label>Paciente *</Form.Label>
+              <Form.Label>Paciente Activo *</Form.Label>
               <Form.Select
                 name="paciente_id"
                 value={formData.paciente_id}
                 onChange={handleChange}
                 required
               >
-                <option value="">Seleccionar paciente...</option>
+                <option value="">Seleccionar paciente activo...</option>
                 {pacientes.map((paciente) => (
                   <option key={paciente.id} value={paciente.id}>
-                    {paciente.numero_expediente} - {paciente.nombre} {paciente.apellidos}
+                    {paciente.numero_expediente} - {paciente.nombre} {paciente.apellidos} 
+                    {paciente.tipo_paciente === 'interno' ? ' (Interno)' : ' (Ambulatorio)'}
+                    {paciente.cuarto_asignado ? ` - ${paciente.cuarto_asignado}` : ''}
                   </option>
                 ))}
               </Form.Select>
+              <Form.Text className="text-muted">
+                Solo se muestran pacientes activos (sin fecha de salida)
+              </Form.Text>
             </Form.Group>
 
             <Form.Group className="mb-3">

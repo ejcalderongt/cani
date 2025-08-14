@@ -26,7 +26,7 @@ app.use(cors({
     // Allow all Replit domains and localhost for development
     const allowedOrigins = [
       'http://localhost:3000',
-      'http://localhost:3001', 
+      'http://localhost:3001',
       'http://localhost:5000',
       'http://localhost:5001',
       /https:\/\/.*\.replit\.dev$/,
@@ -342,16 +342,16 @@ async function initDatabase() {
     // Update admin password to ensure it works
     const hashedAdminPassword = await bcrypt.hash('admin123', 10);
     await pool.query(`
-      UPDATE enfermeros 
-      SET clave = $1, debe_cambiar_clave = false, primer_login = false 
+      UPDATE enfermeros
+      SET clave = $1, debe_cambiar_clave = false, primer_login = false
       WHERE codigo = 'admin'
     `, [hashedAdminPassword]);
 
     // Update existing non-admin users to have default password and require change
     const hashedDefaultPassword = await bcrypt.hash('abc123', 10);
     await pool.query(`
-      UPDATE enfermeros 
-      SET clave = $1, debe_cambiar_clave = true, primer_login = true 
+      UPDATE enfermeros
+      SET clave = $1, debe_cambiar_clave = true, primer_login = true
       WHERE codigo != 'admin'
     `, [hashedDefaultPassword]);
 
@@ -462,9 +462,9 @@ app.post('/api/cambiar-clave', async (req, res) => {
     const { codigo, claveActual, nuevaClave } = req.body;
 
     if (!codigo || !claveActual || !nuevaClave) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Datos incompletos' 
+        message: 'Datos incompletos'
       });
     }
 
@@ -472,9 +472,9 @@ app.post('/api/cambiar-clave', async (req, res) => {
     const userResult = await pool.query('SELECT * FROM enfermeros WHERE codigo = $1', [codigo]);
 
     if (userResult.rows.length === 0) {
-      return res.status(404).json({ 
+      return res.status(404).json({
         success: false,
-        message: 'Usuario no encontrado' 
+        message: 'Usuario no encontrado'
       });
     }
 
@@ -482,9 +482,9 @@ app.post('/api/cambiar-clave', async (req, res) => {
     const validPassword = await bcrypt.compare(claveActual, user.clave); // Use user.clave here
 
     if (!validPassword) {
-      return res.status(400).json({ 
+      return res.status(400).json({
         success: false,
-        message: 'Contraseña actual incorrecta' 
+        message: 'Contraseña actual incorrecta'
       });
     }
 
@@ -512,19 +512,29 @@ app.post('/api/cambiar-clave', async (req, res) => {
 
   } catch (error) {
     console.error('Error changing password:', error);
-    res.status(500).json({ 
+    res.status(500).json({
       success: false,
-      message: 'Error interno del servidor' 
+      message: 'Error interno del servidor'
     });
   }
 });
 
 app.get('/api/pacientes', requireAuth, async (req, res) => {
   try {
-    const result = await pool.query('SELECT * FROM pacientes WHERE activo = true ORDER BY fecha_registro DESC');
+    const { activos_solo } = req.query;
+    let query = `SELECT * FROM pacientes`;
+    let params = [];
+
+    if (activos_solo === 'true') {
+      query += ` WHERE activo = true AND fecha_salida IS NULL`;
+    }
+
+    query += ` ORDER BY fecha_ingreso DESC`;
+
+    const result = await pool.query(query, params);
     res.json(result.rows);
   } catch (error) {
-    console.error('Error fetching pacientes:', error);
+    console.error('Error fetching patients:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
@@ -604,11 +614,11 @@ app.get('/api/pacientes/:id', requireAuth, async (req, res) => {
 app.get('/api/notas', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT n.*, 
-             p.nombre as paciente_nombre, 
+      SELECT n.*,
+             p.nombre as paciente_nombre,
              p.apellidos as paciente_apellidos,
              p.numero_expediente as paciente_expediente,
-             u.nombre as enfermero_nombre, 
+             u.nombre as enfermero_nombre,
              u.apellidos as enfermero_apellidos
       FROM notas_enfermeria n
       JOIN pacientes p ON n.paciente_id = p.id
@@ -733,7 +743,7 @@ app.put('/api/admin/usuarios/:id', requireAdmin, async (req, res) => {
     const { codigo, clave, nombre, apellidos, turno, activo } = req.body;
 
     let query = `
-      UPDATE enfermeros 
+      UPDATE enfermeros
       SET codigo = $1, nombre = $2, apellidos = $3, turno = $4, activo = $5
     `;
     let params = [codigo, nombre, apellidos, turno, activo, id];
@@ -741,7 +751,7 @@ app.put('/api/admin/usuarios/:id', requireAdmin, async (req, res) => {
     if (clave && clave.trim() !== '') {
       const hashedPassword = await bcrypt.hash(clave, 10);
       query = `
-        UPDATE enfermeros 
+        UPDATE enfermeros
         SET codigo = $1, clave = $2, nombre = $3, apellidos = $4, turno = $5, activo = $6
         WHERE id = $7 RETURNING id, codigo, nombre, apellidos, turno, activo
       `;
@@ -881,7 +891,7 @@ app.put('/api/citas/:id', requireAuth, async (req, res) => {
     const { nombre_doctor, fecha_cita, hora_cita, anotaciones, estado } = req.body;
 
     const result = await pool.query(`
-      UPDATE citas_seguimiento 
+      UPDATE citas_seguimiento
       SET nombre_doctor = $1, fecha_cita = $2, hora_cita = $3, anotaciones = $4, estado = $5
       WHERE id = $6
       RETURNING *
@@ -919,7 +929,7 @@ app.delete('/api/citas/:id', requireAuth, async (req, res) => {
 app.get('/api/signos-vitales', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT sv.*, 
+      SELECT sv.*,
              p.nombre as paciente_nombre, p.apellidos as paciente_apellidos, p.numero_expediente,
              e.nombre as enfermero_nombre, e.apellidos as enfermero_apellidos
       FROM signos_vitales sv
@@ -936,9 +946,9 @@ app.get('/api/signos-vitales', requireAuth, async (req, res) => {
 
 app.post('/api/signos-vitales', requireAuth, async (req, res) => {
   try {
-    const { 
-      paciente_id, presion_sistolica, presion_diastolica, 
-      saturacion_oxigeno, frecuencia_cardiaca, temperatura, observaciones 
+    const {
+      paciente_id, presion_sistolica, presion_diastolica,
+      saturacion_oxigeno, frecuencia_cardiaca, temperatura, observaciones
     } = req.body;
 
     const result = await pool.query(`
@@ -980,7 +990,7 @@ app.get('/api/pacientes/:id/signos-vitales', requireAuth, async (req, res) => {
 app.get('/api/pruebas-doping', requireAuth, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT pd.*, 
+      SELECT pd.*,
              p.nombre as paciente_nombre, p.apellidos as paciente_apellidos, p.numero_expediente,
              e.nombre as enfermero_nombre, e.apellidos as enfermero_apellidos
       FROM pruebas_doping pd
@@ -997,9 +1007,9 @@ app.get('/api/pruebas-doping', requireAuth, async (req, res) => {
 
 app.post('/api/pruebas-doping', requireAuth, async (req, res) => {
   try {
-    const { 
-      paciente_id, fecha_prueba, hora_prueba, tipo_muestra, 
-      resultado, sustancias_detectadas, observaciones 
+    const {
+      paciente_id, fecha_prueba, hora_prueba, tipo_muestra,
+      resultado, sustancias_detectadas, observaciones
     } = req.body;
 
     const result = await pool.query(`
@@ -1044,19 +1054,44 @@ app.put('/api/pacientes/:id/alta', requireAuth, async (req, res) => {
     const { fecha_salida, observaciones_alta, medico_autoriza, enfermero_autoriza, director_autoriza } = req.body;
 
     const result = await pool.query(`
-      UPDATE pacientes 
-      SET fecha_salida = $1, observaciones_alta = $2, medico_autoriza = $3, enfermero_autoriza = $4, director_autoriza = $5
+      UPDATE pacientes
+      SET fecha_salida = $1, observaciones_alta = $2, medico_autoriza = $3,
+          enfermero_autoriza = $4, director_autoriza = $5
       WHERE id = $6
       RETURNING *
     `, [fecha_salida, observaciones_alta, medico_autoriza, enfermero_autoriza, director_autoriza, id]);
 
     if (result.rows.length === 0) {
-      return res.status(404).json({ error: 'Paciente no encontrado' });
+      return res.status(404).json({ message: 'Paciente no encontrado' });
     }
 
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error updating patient discharge:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Update patient active status
+app.put('/api/pacientes/:id/activo', requireAuth, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { activo } = req.body;
+
+    const result = await pool.query(`
+      UPDATE pacientes
+      SET activo = $1
+      WHERE id = $2
+      RETURNING *
+    `, [activo, id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ message: 'Paciente no encontrado' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating patient status:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
@@ -1074,10 +1109,10 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
         nacionalidad, contacto_emergencia_nombre, contacto_emergencia_telefono,
         telefono_principal, telefono_secundario, tipo_sangre, peso, estatura,
         padecimientos, informacion_general, tipo_paciente, cuarto_asignado,
-        sexo, fecha_ingreso, motivo_ingreso, fase_tratamiento, unidad_cama, 
-        medico_tratante, equipo_tratante, riesgo_suicidio, riesgo_violencia, 
+        sexo, fecha_ingreso, motivo_ingreso, fase_tratamiento, unidad_cama,
+        medico_tratante, equipo_tratante, riesgo_suicidio, riesgo_violencia,
         riesgo_fuga, riesgo_caidas
-      ) VALUES 
+      ) VALUES
       ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27),
       ($28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54),
       ($55, $56, $57, $58, $59, $60, $61, $62, $63, $64, $65, $66, $67, $68, $69, $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $80, $81)
@@ -1085,7 +1120,7 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
     `, [
       'EXP001', 'Juan Carlos', 'Pérez González', '1985-03-15', '001-150385-1023N',
       'Nicaragüense', 'María González', '8888-1234', '8777-5678', '8666-9012',
-      'O+', 75.5, 1.75, 'Adicción a sustancias psicoactivas', 
+      'O+', 75.5, 1.75, 'Adicción a sustancias psicoactivas',
       'Paciente en proceso de rehabilitación', 'interno', 'HAB-101',
       'Masculino', '2025-01-10 08:30:00', 'desintoxicacion', 'fase_1', 'Cama A',
       'Dr. Roberto Martínez', 'Equipo Alpha', false, false, true, false,
@@ -1106,7 +1141,7 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
     ]);
 
     // Get patient IDs for the notes
-    const pacientesResult = await pool.query('SELECT id, numero_expediente FROM pacientes WHERE numero_expediente IN ($1, $2, $3)', 
+    const pacientesResult = await pool.query('SELECT id, numero_expediente FROM pacientes WHERE numero_expediente IN ($1, $2, $3)',
       ['EXP001', 'EXP002', 'EXP003']);
 
     const pacientes = {};
@@ -1117,9 +1152,9 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
     // Insert sample nursing notes
     await pool.query(`
       INSERT INTO notas_enfermeria (
-        fecha, hora, paciente_id, enfermero_id, observaciones, 
+        fecha, hora, paciente_id, enfermero_id, observaciones,
         medicamentos_administrados, tratamientos
-      ) VALUES 
+      ) VALUES
       ($1, $2, $3, $4, $5, $6, $7),
       ($8, $9, $10, $11, $12, $13, $14),
       ($15, $16, $17, $18, $19, $20, $21),
@@ -1184,8 +1219,8 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
     // Commit transaction
     await pool.query('COMMIT');
 
-    res.json({ 
-      message: 'Datos de ejemplo insertados correctamente. Se crearon 3 pacientes con sus respectivas notas de enfermería, medicamentos y signos vitales.' 
+    res.json({
+      message: 'Datos de ejemplo insertados correctamente. Se crearon 3 pacientes con sus respectivas notas de enfermería, medicamentos y signos vitales.'
     });
 
     console.log('Sample data inserted successfully');
@@ -1238,8 +1273,8 @@ app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
     // Commit transaction
     await pool.query('COMMIT');
 
-    res.json({ 
-      message: 'Base de datos reinicializada correctamente. Se eliminaron todos los pacientes, notas y medicamentos personalizados. Los usuarios se mantuvieron intactos.' 
+    res.json({
+      message: 'Base de datos reinicializada correctamente. Se eliminaron todos los pacientes, notas y medicamentos personalizados. Los usuarios se mantuvieron intactos.'
     });
 
     console.log('Database reset completed successfully');
@@ -1253,8 +1288,8 @@ app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
 
 // Health check endpoint for deployments
 app.get('/api/health', (req, res) => {
-  res.status(200).json({ 
-    status: 'OK', 
+  res.status(200).json({
+    status: 'OK',
     message: 'Hospital Management System API is running',
     timestamp: new Date().toISOString()
   });
@@ -1272,21 +1307,21 @@ app.get('/api/status', async (req, res) => {
 
       const requiereCambio = result.rows.length > 0 && result.rows[0].debe_cambiar_password;
 
-      res.json({ 
+      res.json({
         session: req.session,
         authenticated: true,
         requiere_cambio_clave: requiereCambio
       });
     } catch (error) {
       console.error('Error checking password change requirement:', error);
-      res.json({ 
+      res.json({
         session: req.session,
         authenticated: true,
         requiere_cambio_clave: false
       });
     }
   } else {
-    res.json({ 
+    res.json({
       session: null,
       authenticated: false,
       requiere_cambio_clave: false
@@ -1330,7 +1365,7 @@ initDatabase().then(() => {
 }).catch(error => {
   console.error('Database initialization failed, but server will continue:', error);
   console.log('Some features may not work without a database. Set up PostgreSQL in the Database tab.');
-  
+
   // Start server anyway
   app.listen(port, '0.0.0.0', () => {
     console.log(`Hospital System Server running on http://0.0.0.0:${port} (LIMITED MODE - NO DATABASE)`);

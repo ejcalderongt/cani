@@ -239,6 +239,20 @@ function Pacientes() {
     }
   };
 
+  const toggleActiveStatus = async (paciente) => {
+    try {
+      const newStatus = !paciente.activo;
+      await axios.put(`/api/pacientes/${paciente.id}/activo`, { activo: newStatus });
+      
+      // Update local state
+      setPacientes(pacientes.map(p => 
+        p.id === paciente.id ? { ...p, activo: newStatus } : p
+      ));
+    } catch (error) {
+      console.error('Error al cambiar estado del paciente:', error);
+    }
+  };
+
   if (loading) {
     return (
       <Container className="mt-4">
@@ -290,9 +304,16 @@ function Pacientes() {
                     </td>
                     <td>{paciente.cuarto_asignado || 'N/A'}</td>
                     <td>
-                      <Badge bg={paciente.fecha_salida ? 'success' : 'primary'}>
-                        {paciente.fecha_salida ? 'Alta' : 'Activo'}
-                      </Badge>
+                      <div className="d-flex flex-column gap-1">
+                        <Badge bg={paciente.fecha_salida ? 'success' : 'primary'}>
+                          {paciente.fecha_salida ? 'Alta' : 'Activo'}
+                        </Badge>
+                        {!paciente.fecha_salida && (
+                          <Badge bg={paciente.activo ? 'success' : 'warning'} className="small">
+                            {paciente.activo ? 'Vigente' : 'Inactivo'}
+                          </Badge>
+                        )}
+                      </div>
                     </td>
                     <td>
                       <div className="d-flex gap-2">
@@ -305,13 +326,22 @@ function Pacientes() {
                           Ver
                         </Button>
                         {!paciente.fecha_salida && (
-                          <Button
-                            variant="outline-success"
-                            size="sm"
-                            onClick={() => handleDischarge(paciente)}
-                          >
-                            Alta
-                          </Button>
+                          <>
+                            <Button
+                              variant="outline-success"
+                              size="sm"
+                              onClick={() => handleDischarge(paciente)}
+                            >
+                              Alta
+                            </Button>
+                            <Button
+                              variant={paciente.activo ? "outline-warning" : "outline-success"}
+                              size="sm"
+                              onClick={() => toggleActiveStatus(paciente)}
+                            >
+                              {paciente.activo ? 'Inactivar' : 'Activar'}
+                            </Button>
+                          </>
                         )}
                       </div>
                     </td>

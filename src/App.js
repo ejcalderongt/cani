@@ -16,6 +16,7 @@ import MantenimientoUsuarios from './components/MantenimientoUsuarios';
 import ConfiguracionSistema from './components/ConfiguracionSistema';
 import ImprimirNotas from './components/ImprimirNotas';
 import CambiarClave from './components/CambiarClave';
+import NotasActuales from './components/NotasActuales'; // Assuming NotasActuales component is in this path
 
 // Simple axios setup - only relative URLs
 axios.defaults.withCredentials = true;
@@ -147,10 +148,9 @@ function App() {
 
           <Route
             path="/imprimir-notas"
-            element={
-              isAuthenticated ? <ImprimirNotas /> : <Navigate to="/login" />
-            }
+            element={<ImprimirNotas />}
           />
+            <Route path="/notas-actuales" element={<NotasActuales />} />
 
           <Route
             path="/admin/usuarios"
