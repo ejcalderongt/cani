@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Container, Card, Button, Table, Modal } from 'react-bootstrap';
+import { Container, Card, Button, Table, Modal, ProgressBar, Alert } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 
@@ -9,12 +9,20 @@ function NotasEnfermeria() {
   const [loading, setLoading] = useState(true);
   const [selectedNota, setSelectedNota] = useState(null);
   const [showModal, setShowModal] = useState(false);
+  const [estadoLlenado, setEstadoLlenado] = useState({});
+
+  // Configuración para hoja legal estándar
+  const CARACTERES_POR_HOJA = 2000;
 
   useEffect(() => {
     const fetchNotas = async () => {
       try {
         const response = await axios.get('/api/notas');
-        setNotas(response.data);
+        const notasData = response.data;
+        setNotas(notasData);
+        
+        // Calcular estado de llenado por paciente para el día actual
+        calcularEstadoLlenado(notasData);
       } catch (error) {
         console.error('Error al cargar notas:', error);
       } finally {
@@ -24,6 +32,42 @@ function NotasEnfermeria() {
 
     fetchNotas();
   }, []);
+
+  const calcularEstadoLlenado = (notasData) => {
+    const hoy = new Date().toISOString().split('T')[0];
+    const estadoPorPaciente = {};
+
+    // Agrupar notas por paciente para el día actual
+    notasData.forEach(nota => {
+      if (nota.fecha === hoy) {
+        const pacienteId = nota.paciente_id;
+        if (!estadoPorPaciente[pacienteId]) {
+          estadoPorPaciente[pacienteId] = {
+            nombre: `${nota.paciente_nombre} ${nota.paciente_apellidos}`,
+            expediente: nota.paciente_expediente,
+            caracteresTotales: 0,
+            cantidadNotas: 0
+          };
+        }
+        estadoPorPaciente[pacienteId].caracteresTotales += (nota.observaciones?.length || 0);
+        estadoPorPaciente[pacienteId].cantidadNotas += 1;
+      }
+    });
+
+    setEstadoLlenado(estadoPorPaciente);
+  };
+
+  const getPorcentajeLlenado = (pacienteId) => {
+    const estado = estadoLlenado[pacienteId];
+    if (!estado) return 0;
+    return Math.min((estado.caracteresTotales / CARACTERES_POR_HOJA) * 100, 100);
+  };
+
+  const getVarianteLlenado = (porcentaje) => {
+    if (porcentaje >= 85) return 'danger';
+    if (porcentaje >= 60) return 'warning';
+    return 'success';
+  };
 
   const formatDateTime = (fecha, hora) => {
     try {
@@ -71,6 +115,52 @@ function NotasEnfermeria() {
         </Button>
       </div>
 
+      {/* Mostrar estado de llenado del día actual */}
+      {Object.keys(estadoLlenado).length > 0 && (
+        <Card className="mb-4">
+          <Card.Header>
+            <h5 className="mb-0">Estado de Llenado de Hojas - Día Actual</h5>
+          </Card.Header>
+          <Card.Body>
+            {Object.entries(estadoLlenado).map(([pacienteId, estado]) => {
+              const porcentaje = getPorcentajeLlenado(pacienteId);
+              return (
+                <div key={pacienteId} className="mb-3">
+                  <div className="d-flex justify-content-between align-items-center mb-1">
+                    <small>
+                      <strong>{estado.nombre}</strong> (Exp: {estado.expediente})
+                    </small>
+                    <small>
+                      {Math.round(porcentaje)}% - {estado.cantidadNotas} nota(s)
+                    </small>
+                  </div>
+                  <ProgressBar
+                    now={porcentaje}
+                    variant={getVarianteLlenado(porcentaje)}
+                    size="sm"
+                  />
+                  {porcentaje >= 85 && (
+                    <Alert variant="warning" className="mt-2 mb-0 py-2">
+                      <small>⚠️ Hoja casi llena - Se recomienda imprimir</small>
+                    </Alert>
+                  )}
+                </div>
+              );
+            })}
+            <div className="text-end mt-3">
+              <Button
+                as={Link}
+                to="/imprimir-notas"
+                variant="outline-primary"
+                size="sm"
+              >
+                📄 Imprimir Notas
+              </Button>
+            </div>
+          </Card.Body>
+        </Card>
+      )}
+
       <Card>
         <Card.Body>
           {notas.length === 0 ? (
@@ -83,6 +173,7 @@ function NotasEnfermeria() {
                   <th>Paciente</th>
                   <th>Enfermero(a)</th>
                   <th>Observaciones</th>
+                  <th>Estado Hoja</th>
                 </tr>
               </thead>
               <tbody>
@@ -105,6 +196,21 @@ function NotasEnfermeria() {
                         ? `${nota.observaciones.substring(0, 80)}...` 
                         : nota.observaciones
                       }
+                    </td>
+                    <td style={{ width: '120px' }}>
+                      {nota.fecha === new Date().toISOString().split('T')[0] && (
+                        <div>
+                          <small className="text-muted d-block">
+                            {Math.round(getPorcentajeLlenado(nota.paciente_id))}%
+                          </small>
+                          <ProgressBar
+                            now={getPorcentajeLlenado(nota.paciente_id)}
+                            variant={getVarianteLlenado(getPorcentajeLlenado(nota.paciente_id))}
+                            size="sm"
+                            style={{ height: '6px' }}
+                          />
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}

@@ -131,12 +131,10 @@ function NuevaNota() {
         fetchNotasPaciente();
       }
 
-      // Redireccionar solo si no hay advertencia de impresión
-      if (!debeImprimir()) {
-        setTimeout(() => {
-          navigate('/notas');
-        }, 2000);
-      }
+      // Redireccionar a la visualización de notas para ver el grado de llenado
+      setTimeout(() => {
+        navigate('/notas');
+      }, 1500);
     } catch (error) {
       console.error('Error al registrar nota:', error);
       setError('Error al registrar la nota');
