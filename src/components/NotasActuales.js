@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Container, Card, Form, Button, Table, Alert, Badge, Modal } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
@@ -11,6 +10,7 @@ function NotasActuales() {
   const [selectedNota, setSelectedNota] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [pacientes, setPacientes] = useState([]);
+  const [formatoImpresion, setFormatoImpresion] = useState('con-lineas'); // Added state for print format
   const navigate = useNavigate();
 
   // Set default dates (yesterday and today)
@@ -88,7 +88,7 @@ function NotasActuales() {
 
     // Get notes for this patient in the current date range
     const notasPaciente = notas.filter(nota => nota.paciente_id === pacienteId);
-    
+
     if (notasPaciente.length === 0) {
       setError('No hay notas para imprimir de este paciente');
       return;
@@ -136,6 +136,41 @@ function NotasActuales() {
       return fechaA - fechaB;
     });
 
+    const buildTableRows = (notas) => {
+      return notas.map((nota) => {
+        const observacionesLimpias = nota.observaciones
+          .replace(/\n{3,}/g, '\n\n')
+          .replace(/\s{2,}/g, ' ')
+          .trim();
+
+        const rowContent = `
+          <tr>
+            <td style="text-align: center;">${nota.fechaFormateada}</td>
+            <td style="text-align: center;">${nota.horaFormateada}</td>
+            <td>${observacionesLimpias.replace(/\n/g, '<br>')}</td>
+            <td style="text-align: center;">
+              <div style="margin-bottom: 20px;">
+                ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
+              </div>
+              <div style="border-top: 1px solid #000; padding-top: 2px;">
+                Firma
+              </div>
+            </td>
+          </tr>
+        `;
+
+        if (formatoImpresion === 'con-lineas') {
+          return rowContent;
+        } else {
+          // For simplified format, don't add extra horizontal rules or complex cell structures if not needed
+          // For now, let's just return the content within a single row, no explicit dividing lines between rows
+          return rowContent; // Simplification logic could be more complex if needed
+        }
+      }).join('');
+    };
+
+    const tableBody = buildTableRows(notasFormateadas);
+
     return `
       <!DOCTYPE html>
       <html>
@@ -181,7 +216,7 @@ function NotasActuales() {
             .notes-section table {
               width: 100%;
               border-collapse: collapse;
-              border: 2px solid #000;
+              border: 2px solid #000; /* Outer border for the table */
             }
             .notes-section th {
               background-color: #f0f0f0;
@@ -191,11 +226,27 @@ function NotasActuales() {
               font-size: 10px;
             }
             .notes-section td {
-              border: 1px solid #000;
+              border: ${formatoImpresion === 'con-lineas' ? '1px solid #000' : 'none'}; /* Conditional border for rows */
               padding: 5px;
               vertical-align: top;
               font-size: 9px;
+              ${formatoImpresion === 'con-lineas' ? '' : 'border-bottom: 1px solid #eee;'} /* Add subtle line for simplified if needed */
             }
+            /* Specific styling for simplified format to remove internal borders */
+            ${formatoImpresion === 'simplificado' ? `
+              .notes-section td:not(:last-child) {
+                border-right: none;
+              }
+              .notes-section tr:not(:last-child) td {
+                border-bottom: none;
+              }
+              .notes-section table {
+                border: 2px solid #000; /* Keep outer border */
+              }
+              .notes-section th {
+                border: 1px solid #000; /* Keep header borders */
+              }
+            ` : ''}
             @media print {
               body { margin: 0; }
             }
@@ -240,28 +291,7 @@ function NotasActuales() {
                 </tr>
               </thead>
               <tbody>
-                ${notasFormateadas.map((nota) => {
-                  const observacionesLimpias = nota.observaciones
-                    .replace(/\n{3,}/g, '\n\n')
-                    .replace(/\s{2,}/g, ' ')
-                    .trim();
-
-                  return `
-                    <tr>
-                      <td style="text-align: center;">${nota.fechaFormateada}</td>
-                      <td style="text-align: center;">${nota.horaFormateada}</td>
-                      <td>${observacionesLimpias.replace(/\n/g, '<br>')}</td>
-                      <td style="text-align: center;">
-                        <div style="margin-bottom: 20px;">
-                          ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
-                        </div>
-                        <div style="border-top: 1px solid #000; padding-top: 2px;">
-                          Firma
-                        </div>
-                      </td>
-                    </tr>
-                  `;
-                }).join('')}
+                ${tableBody}
               </tbody>
             </table>
           </div>
@@ -281,7 +311,7 @@ function NotasActuales() {
     <Container className="mt-4">
       <div className="d-flex justify-content-between align-items-center mb-4">
         <h1>Notas Actuales</h1>
-        <Button 
+        <Button
           variant="secondary"
           onClick={() => navigate('/dashboard')}
         >
@@ -291,11 +321,11 @@ function NotasActuales() {
 
       <Card className="mb-4">
         <Card.Header>
-          <h5 className="mb-0">Filtrar Notas por Rango de Fechas</h5>
+          <h5>Filtros y Configuración de Impresión</h5>
         </Card.Header>
         <Card.Body>
           {error && <Alert variant="danger">{error}</Alert>}
-          
+
           <Form>
             <div className="row">
               <div className="col-md-4">
@@ -327,6 +357,32 @@ function NotasActuales() {
                 >
                   {loading ? 'Cargando...' : 'Buscar Notas'}
                 </Button>
+              </div>
+            </div>
+
+            <div className="row mt-3">
+              <div className="col-12">
+                <Form.Group>
+                  <Form.Label>Formato de Impresión PDF</Form.Label>
+                  <div className="d-flex gap-3">
+                    <Form.Check
+                      type="radio"
+                      id="formato-con-lineas-actual"
+                      name="formatoActual"
+                      label="Con líneas divisorias (Formato oficial)"
+                      checked={formatoImpresion === 'con-lineas'}
+                      onChange={() => setFormatoImpresion('con-lineas')}
+                    />
+                    <Form.Check
+                      type="radio"
+                      id="formato-simplificado-actual"
+                      name="formatoActual"
+                      label="Simplificado (Sin líneas divisorias)"
+                      checked={formatoImpresion === 'simplificado'}
+                      onChange={() => setFormatoImpresion('simplificado')}
+                    />
+                  </div>
+                </Form.Group>
               </div>
             </div>
           </Form>
@@ -386,7 +442,7 @@ function NotasActuales() {
                     {notasAgrupadas[fecha]
                       .sort((a, b) => b.hora.localeCompare(a.hora))
                       .map((nota) => (
-                        <tr 
+                        <tr
                           key={nota.id}
                           onClick={() => handleRowClick(nota)}
                           style={{ cursor: 'pointer' }}
@@ -403,8 +459,8 @@ function NotasActuales() {
                           <td>{nota.enfermero_nombre} {nota.enfermero_apellidos}</td>
                           <td>
                             <div style={{ maxWidth: '400px' }}>
-                              {nota.observaciones.length > 100 
-                                ? `${nota.observaciones.substring(0, 100)}...` 
+                              {nota.observaciones.length > 100
+                                ? `${nota.observaciones.substring(0, 100)}...`
                                 : nota.observaciones
                               }
                             </div>
@@ -446,7 +502,7 @@ function NotasActuales() {
                   {selectedNota.enfermero_nombre} {selectedNota.enfermero_apellidos}
                 </div>
               </div>
-              
+
               <div className="row mb-3">
                 <div className="col-md-6">
                   <strong>Fecha:</strong> {formatDateTime(selectedNota.fecha, selectedNota.hora)}
@@ -487,8 +543,8 @@ function NotasActuales() {
             Cerrar
           </Button>
           {selectedNota && (
-            <Button 
-              variant="success" 
+            <Button
+              variant="success"
               onClick={() => {
                 imprimirNotaPaciente(selectedNota.paciente_id);
                 setShowModal(false);

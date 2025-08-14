@@ -16,6 +16,7 @@ function ImprimirNotas() {
   
   const [fechaInicio, setFechaInicio] = useState(yesterday.toISOString().split('T')[0]);
   const [fechaFin, setFechaFin] = useState(today.toISOString().split('T')[0]);
+  const [formatoImpresion, setFormatoImpresion] = useState('con-lineas'); // 'con-lineas' o 'simplificado'
 
   useEffect(() => {
     fetchPacientes();
@@ -66,7 +67,9 @@ function ImprimirNotas() {
 
     // Crear una nueva ventana para imprimir
     const printWindow = window.open('', '_blank');
-    const printContent = generatePrintHTML(paciente, notas);
+    const printContent = formatoImpresion === 'con-lineas' 
+      ? generatePrintHTML(paciente, notas) 
+      : generateSimplifiedPrintHTML(paciente, notas);
 
     printWindow.document.write(printContent);
     printWindow.document.close();
@@ -412,6 +415,249 @@ function ImprimirNotas() {
     `;
   };
 
+  const generateSimplifiedPrintHTML = (paciente, notas) => {
+    const fechaImpresion = new Date().toLocaleDateString('es-ES', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
+
+    // Formatear cada nota con su fecha y hora específica
+    const notasFormateadas = notas.map(nota => {
+      const fechaObj = new Date(nota.fecha + 'T' + nota.hora);
+      const fechaFormateada = fechaObj.toLocaleDateString('es-ES', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      const horaFormateada = nota.hora.substring(0, 5); // HH:MM
+
+      return {
+        ...nota,
+        fechaFormateada,
+        horaFormateada
+      };
+    }).sort((a, b) => {
+      const fechaA = new Date(a.fecha + 'T' + a.hora);
+      const fechaB = new Date(b.fecha + 'T' + b.hora);
+      return fechaA - fechaB;
+    });
+
+    return `
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8">
+          <title>Notas de Enfermería - ${paciente?.nombre} ${paciente?.apellidos}</title>
+          <style>
+            body {
+              font-family: 'Times New Roman', serif;
+              margin: 10mm;
+              font-size: 10px;
+              line-height: 1.3;
+              color: #000;
+            }
+            .header {
+              text-align: center;
+              border-bottom: 2px solid #333;
+              padding-bottom: 10px;
+              margin-bottom: 20px;
+            }
+            .header h1 {
+              margin: 0;
+              font-size: 18px;
+              color: #0F766E;
+            }
+            .header h2 {
+              margin: 5px 0;
+              font-size: 14px;
+              color: #666;
+            }
+            .patient-info {
+              background: #f8f9fa;
+              padding: 15px;
+              border-radius: 5px;
+              margin-bottom: 20px;
+              border: 1px solid #dee2e6;
+            }
+            .patient-info h3 {
+              margin: 0 0 10px 0;
+              color: #0F766E;
+              font-size: 14px;
+            }
+            .info-row {
+              display: flex;
+              margin-bottom: 5px;
+            }
+            .info-label {
+              font-weight: bold;
+              width: 150px;
+              flex-shrink: 0;
+            }
+            .form-header {
+              border: 2px solid #000;
+              padding: 10px;
+              margin: 20px 0;
+            }
+            .notes-content {
+              border: 2px solid #000;
+              padding: 15px;
+              margin: 20px 0;
+              min-height: 400px;
+              background-color: white;
+            }
+            .note-entry {
+              margin-bottom: 15px;
+              line-height: 1.4;
+            }
+            .note-datetime {
+              font-weight: bold;
+              color: #0F766E;
+              margin-bottom: 3px;
+            }
+            .note-text {
+              margin-left: 10px;
+              text-align: justify;
+            }
+            .footer {
+              margin-top: 30px;
+              border: 2px solid #000;
+              padding: 10px;
+              page-break-inside: avoid;
+            }
+            @media print {
+              body { margin: 0; }
+              .header { page-break-after: avoid; }
+              .patient-info { page-break-after: avoid; }
+              .footer { page-break-before: avoid; }
+            }
+          </style>
+        </head>
+        <body>
+          <div class="header">
+            <h1>SISTEMA HOSPITALARIO</h1>
+            <h2>NOTAS DE ENFERMERÍA - FORMATO SIMPLIFICADO</h2>
+          </div>
+
+          <div class="patient-info">
+            <h3>INFORMACIÓN DEL PACIENTE</h3>
+            <div class="info-row">
+              <span class="info-label">Expediente:</span>
+              <span>${paciente?.numero_expediente || 'N/A'}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Nombre:</span>
+              <span>${paciente?.nombre || ''} ${paciente?.apellidos || ''}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Fecha de Nacimiento:</span>
+              <span>${paciente?.fecha_nacimiento ? (() => {
+                const fecha = new Date(paciente.fecha_nacimiento + 'T00:00:00');
+                return fecha.toLocaleDateString('es-ES');
+              })() : 'N/A'}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Tipo de Sangre:</span>
+              <span>${paciente?.tipo_sangre || 'N/A'}</span>
+            </div>
+            <div class="info-row">
+              <span class="info-label">Tipo de Paciente:</span>
+              <span class="text-capitalize">${paciente?.tipo_paciente || 'N/A'}</span>
+            </div>
+            ${paciente?.cuarto_asignado ? `
+            <div class="info-row">
+              <span class="info-label">Cuarto:</span>
+              <span>${paciente.cuarto_asignado}</span>
+            </div>
+            ` : ''}
+          </div>
+
+          <div class="form-header">
+            <table style="width: 100%; border-collapse: collapse;">
+              <tr>
+                <td style="width: 70%; border-right: 1px solid #000; padding-right: 10px;">
+                  <strong>Nombre y apellidos del paciente:</strong><br>
+                  <span style="font-size: 14px;">${paciente?.nombre || ''} ${paciente?.apellidos || ''}</span>
+                </td>
+                <td style="width: 30%; padding-left: 10px; text-align: center;">
+                  <strong>No. Expediente:</strong><br>
+                  <span style="font-size: 14px;">${paciente?.numero_expediente || 'N/A'}</span>
+                </td>
+              </tr>
+              <tr style="border-top: 1px solid #000;">
+                <td style="border-right: 1px solid #000; padding-right: 10px; padding-top: 5px;">
+                  <strong>Sala:</strong> ${paciente?.cuarto_asignado || '_____________'}&nbsp;&nbsp;&nbsp;&nbsp;
+                  <strong>Cuarto:</strong> ${paciente?.unidad_cama || '_____________'}
+                </td>
+                <td style="padding-left: 10px; padding-top: 5px; text-align: center;">
+                  <strong>No. Cédula:</strong><br>
+                  ${paciente?.documento_identidad || '_____________'}
+                </td>
+              </tr>
+            </table>
+          </div>
+
+          <div class="notes-content">
+            <h4 style="text-align: center; margin-bottom: 20px; color: #0F766E;">OBSERVACIONES Y CUIDADOS DE ENFERMERÍA</h4>
+            ${notasFormateadas.map((nota) => {
+              let observacionesLimpias = '';
+              if (nota.observaciones) {
+                observacionesLimpias = nota.observaciones
+                  .replace(/\n{3,}/g, '\n\n')
+                  .replace(/\s{2,}/g, ' ')
+                  .trim();
+              }
+
+              return `
+                <div class="note-entry">
+                  <div class="note-datetime">
+                    ${nota.fechaFormateada} - ${nota.horaFormateada} | ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
+                  </div>
+                  <div class="note-text">
+                    ${observacionesLimpias.replace(/\n/g, '<br>')}
+                    ${nota.medicamentos_administrados ? `<br><strong>Medicamentos:</strong> ${nota.medicamentos_administrados}` : ''}
+                    ${nota.tratamientos ? `<br><strong>Tratamientos:</strong> ${nota.tratamientos}` : ''}
+                  </div>
+                </div>
+              `;
+            }).join('')}
+          </div>
+
+          <div class="footer">
+            <div style="text-align: center; margin-bottom: 10px;">
+              <small><strong>TODA NOTA DEBE INCLUIR:</strong> Nombre y apellido del profesional, así como la firma y código</small>
+            </div>
+
+            <div style="border-top: 1px solid #000; padding-top: 10px;">
+              <div style="display: flex; justify-content: space-between;">
+                <div style="width: 30%; text-align: center;">
+                  <p><strong>Total de registros:</strong> ${notas.length}</p>
+                  <p><strong>Período:</strong><br>${fechaInicio || 'Inicio'} al ${fechaFin || new Date().toISOString().split('T')[0]}</p>
+                </div>
+
+                <div style="width: 65%; display: flex; flex-wrap: wrap; gap: 20px;">
+                  ${[...new Set(notasFormateadas.map(nota => nota.enfermero_nombre + ' ' + nota.enfermero_apellidos))].map(enfermero => `
+                    <div style="text-align: center; min-width: 150px;">
+                      <div style="height: 50px; border-bottom: 1px solid #000; margin-bottom: 5px;"></div>
+                      <small>${enfermero}<br>Enfermero(a)</small>
+                    </div>
+                  `).join('')}
+                </div>
+              </div>
+            </div>
+
+            <div style="text-align: center; font-size: 8px; color: #666; margin-top: 20px; border-top: 1px solid #ccc; padding-top: 5px;">
+              Documento generado automáticamente el ${fechaImpresion}<br>
+              Sistema Hospitalario - Notas de Enfermería (Formato Simplificado)
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+  };
+
   return (
     <Container className="mt-4">
       <h1 className="mb-4">Imprimir Notas de Enfermería</h1>
@@ -473,14 +719,46 @@ function ImprimirNotas() {
               >
                 {loading ? 'Cargando...' : 'Buscar Notas'}
               </Button>
-              <Button
-                variant="success"
-                onClick={imprimirPDF}
-                disabled={notas.length === 0}
-              >
-                📄 Imprimir PDF
-              </Button>
             </div>
+          </div>
+
+          {notas.length > 0 && (
+            <div className="row">
+              <div className="col-12">
+                <Form.Group className="mb-3">
+                  <Form.Label>Formato de Impresión</Form.Label>
+                  <div className="d-flex gap-3">
+                    <Form.Check
+                      type="radio"
+                      id="formato-con-lineas"
+                      name="formato"
+                      label="Con líneas divisorias (Formato oficial)"
+                      checked={formatoImpresion === 'con-lineas'}
+                      onChange={() => setFormatoImpresion('con-lineas')}
+                    />
+                    <Form.Check
+                      type="radio"
+                      id="formato-simplificado"
+                      name="formato"
+                      label="Simplificado (Sin líneas divisorias)"
+                      checked={formatoImpresion === 'simplificado'}
+                      onChange={() => setFormatoImpresion('simplificado')}
+                    />
+                  </div>
+                </Form.Group>
+                <div className="text-center">
+                  <Button
+                    variant="success"
+                    onClick={imprimirPDF}
+                    disabled={notas.length === 0}
+                    size="lg"
+                  >
+                    📄 Imprimir PDF ({formatoImpresion === 'con-lineas' ? 'Con líneas' : 'Simplificado'})
+                  </Button>
+                </div>
+              </div>
+            </div>
+          )}</div>
           </div>
         </Card.Body>
       </Card>
