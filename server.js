@@ -95,13 +95,16 @@ app.use(session({
     pool: pool,
     tableName: 'session'
   }),
-  secret: 'your-secret-key-here',
+  secret: process.env.SESSION_SECRET || 'your-secret-key-here-change-in-production',
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: process.env.NODE_ENV === 'production',
-    maxAge: 30 * 24 * 60 * 60 * 1000 // 30 days
-  }
+    secure: false, // Cambiar a false temporalmente para debug
+    httpOnly: true,
+    maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
+    sameSite: 'lax' // Añadir para mejor compatibilidad
+  },
+  name: 'hospital.session' // Nombre específico para la sesión
 }));
 
 // Initialize database tables
@@ -123,6 +126,8 @@ async function initDatabase() {
       )
       WITH (OIDS=FALSE);
     `);
+
+    console.log('Session table created/verified successfully');
 
     // Only add primary key if it doesn't exist
     await pool.query(`
@@ -381,14 +386,23 @@ async function initDatabase() {
 // Authentication middleware
 const requireAuth = (req, res, next) => {
   console.log('Auth check:', {
-    session: req.session,
+    sessionExists: !!req.session,
+    sessionId: req.session?.id,
     enfermero_id: req.session?.enfermero_id,
-    url: req.url
+    url: req.url,
+    cookies: req.headers.cookie,
+    userAgent: req.headers['user-agent']
   });
 
-  if (!req.session.enfermero_id) {
-    console.log('Authentication failed - no enfermero_id in session');
-    return res.status(401).json({ error: 'No autenticado' });
+  if (!req.session || !req.session.enfermero_id) {
+    console.log('Authentication failed - no valid session or enfermero_id');
+    return res.status(401).json({ 
+      error: 'No autenticado',
+      debug: {
+        hasSession: !!req.session,
+        hasEnfermeroId: !!(req.session && req.session.enfermero_id)
+      }
+    });
   }
   next();
 };
@@ -1375,34 +1389,61 @@ app.get('/api/health', (req, res) => {
 
 // Database status endpoint for debugging
 app.get('/api/status', async (req, res) => {
+  console.log('Status check:', {
+    sessionExists: !!req.session,
+    sessionId: req.session?.id,
+    enfermeroId: req.session?.enfermero_id,
+    cookies: req.headers.cookie
+  });
+
   if (req.session && req.session.enfermero_id) {
     try {
       // Check if user needs to change password
       const result = await pool.query(
-        'SELECT debe_cambiar_clave FROM enfermeros WHERE id = $1',
+        'SELECT debe_cambiar_clave, codigo, nombre FROM enfermeros WHERE id = $1',
         [req.session.enfermero_id]
       );
 
-      const requiereCambio = result.rows.length > 0 && result.rows[0].debe_cambiar_clave;
+      if (result.rows.length === 0) {
+        console.log('User not found in database');
+        return res.json({
+          authenticated: false,
+          error: 'Usuario no encontrado',
+          debug: { enfermeroId: req.session.enfermero_id }
+        });
+      }
+
+      const user = result.rows[0];
+      const requiereCambio = user.debe_cambiar_clave;
 
       res.json({
-        session: req.session,
         authenticated: true,
-        requiere_cambio_clave: requiereCambio
+        requiere_cambio_clave: requiereCambio,
+        usuario: {
+          codigo: user.codigo,
+          nombre: user.nombre
+        },
+        debug: {
+          sessionId: req.session.id,
+          enfermeroId: req.session.enfermero_id
+        }
       });
     } catch (error) {
       console.error('Error checking password change requirement:', error);
       res.json({
-        session: req.session,
-        authenticated: true,
-        requiere_cambio_clave: false
+        authenticated: false,
+        error: 'Error de base de datos',
+        debug: { error: error.message }
       });
     }
   } else {
     res.json({
-      session: null,
       authenticated: false,
-      requiere_cambio_clave: false
+      requiere_cambio_clave: false,
+      debug: {
+        hasSession: !!req.session,
+        sessionKeys: req.session ? Object.keys(req.session) : []
+      }
     });
   }
 });
