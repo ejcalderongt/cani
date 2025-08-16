@@ -35,8 +35,8 @@ function Navbar({ enfermero, onLogout }) {
 
           <Nav>
             <BootstrapNavbar.Text className="me-3">
-              👤 {enfermero.nombre && enfermero.apellidos 
-                ? `${enfermero.nombre} ${enfermero.apellidos}` 
+              👤 {enfermero.nombre && enfermero.apellidos
+                ? `${enfermero.nombre} ${enfermero.apellidos}`
                 : enfermero.codigo || 'Usuario'}
             </BootstrapNavbar.Text>
             <Nav.Link onClick={onLogout}>

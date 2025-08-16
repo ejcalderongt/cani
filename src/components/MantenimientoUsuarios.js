@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Container, Card, Button, Table, Modal, Form, Alert } from 'react-bootstrap';
 import axios from 'axios';
@@ -17,7 +16,7 @@ function MantenimientoUsuarios() {
     apellidos: '',
     turno: 'mañana',
     activo: true,
-    debe_cambiar_password: false
+    debe_cambiar_clave: false
   });
 
   useEffect(() => {
@@ -51,13 +50,17 @@ function MantenimientoUsuarios() {
 
     try {
       if (editingUser) {
-        await axios.put(`/api/admin/usuarios/${editingUser.id}`, formData);
+        await axios.put(`/api/admin/usuarios/${editingUser.id}`, formData, {
+          withCredentials: true
+        });
         setSuccess('Usuario actualizado correctamente');
       } else {
-        await axios.post('/api/admin/usuarios', formData);
+        await axios.post('/api/admin/usuarios', formData, {
+          withCredentials: true
+        });
         setSuccess('Usuario creado correctamente');
       }
-      
+
       setShowModal(false);
       setEditingUser(null);
       setFormData({
@@ -67,7 +70,7 @@ function MantenimientoUsuarios() {
         apellidos: '',
         turno: 'mañana',
         activo: true,
-        debe_cambiar_password: false
+        debe_cambiar_clave: false
       });
       fetchUsuarios();
     } catch (error) {
@@ -84,7 +87,7 @@ function MantenimientoUsuarios() {
       apellidos: usuario.apellidos,
       turno: usuario.turno,
       activo: usuario.activo,
-      debe_cambiar_password: usuario.debe_cambiar_password || false
+      debe_cambiar_clave: usuario.debe_cambiar_clave || false
     });
     setShowModal(true);
   };
@@ -97,7 +100,9 @@ function MantenimientoUsuarios() {
 
     if (window.confirm('¿Está seguro de que desea desactivar este usuario?')) {
       try {
-        await axios.delete(`/api/admin/usuarios/${id}`);
+        await axios.delete(`/api/admin/usuarios/${id}`, {
+          withCredentials: true
+        });
         setSuccess('Usuario desactivado correctamente');
         fetchUsuarios();
       } catch (error) {
@@ -115,7 +120,7 @@ function MantenimientoUsuarios() {
       apellidos: '',
       turno: 'mañana',
       activo: true,
-      debe_cambiar_password: true
+      debe_cambiar_clave: true
     });
     setShowModal(true);
   };
@@ -171,8 +176,8 @@ function MantenimientoUsuarios() {
                     </span>
                   </td>
                   <td>
-                    <span className={`badge bg-${usuario.debe_cambiar_password ? 'warning' : 'success'}`}>
-                      {usuario.debe_cambiar_password ? 'Sí' : 'No'}
+                    <span className={`badge bg-${usuario.debe_cambiar_clave ? 'warning' : 'success'}`}>
+                      {usuario.debe_cambiar_clave ? 'Sí' : 'No'}
                     </span>
                   </td>
                   <td>
@@ -304,8 +309,8 @@ function MantenimientoUsuarios() {
                   <Form.Group className="mb-3">
                     <Form.Check
                       type="checkbox"
-                      name="debe_cambiar_password"
-                      checked={formData.debe_cambiar_password}
+                      name="debe_cambiar_clave"
+                      checked={formData.debe_cambiar_clave}
                       onChange={handleChange}
                       label="Debe cambiar contraseña"
                       disabled={editingUser?.codigo === 'admin'}
@@ -314,13 +319,13 @@ function MantenimientoUsuarios() {
                 </div>
               </div>
             )}
-            
+
             {!editingUser && (
               <Form.Group className="mb-3">
                 <Form.Check
                   type="checkbox"
-                  name="debe_cambiar_password"
-                  checked={formData.debe_cambiar_password}
+                  name="debe_cambiar_clave"
+                  checked={formData.debe_cambiar_clave}
                   onChange={handleChange}
                   label="Debe cambiar contraseña al iniciar sesión"
                 />

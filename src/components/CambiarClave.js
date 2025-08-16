@@ -39,10 +39,11 @@ function CambiarClave({ usuario, onPasswordChanged, onCancel }) {
     }
 
     try {
-      const response = await axios.post('/api/cambiar-clave', {
-        codigo: usuario.codigo,
-        clave_actual: formData.clave_actual,
-        clave_nueva: formData.clave_nueva
+      const response = await axios.post('/api/cambiar-mi-clave', {
+        claveActual: formData.clave_actual,
+        nuevaClave: formData.clave_nueva
+      }, {
+        withCredentials: true
       });
 
       if (response.data.success) {

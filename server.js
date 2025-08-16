@@ -496,7 +496,7 @@ app.post('/api/cambiar-clave', async (req, res) => {
     }
 
     const user = userResult.rows[0];
-    const validPassword = await bcrypt.compare(claveActual, user.clave); // Use user.clave here
+    const validPassword = await bcrypt.compare(claveActual, user.clave);
 
     if (!validPassword) {
       return res.status(400).json({
@@ -521,6 +521,67 @@ app.post('/api/cambiar-clave', async (req, res) => {
         }
       });
     }
+
+    res.json({
+      success: true,
+      message: 'Contraseña cambiada correctamente. Por favor inicia sesión nuevamente.'
+    });
+
+  } catch (error) {
+    console.error('Error changing password:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor'
+    });
+  }
+});
+
+// Endpoint for users to change their own password while logged in
+app.post('/api/cambiar-mi-clave', requireAuth, async (req, res) => {
+  try {
+    const { claveActual, nuevaClave } = req.body;
+
+    if (!claveActual || !nuevaClave) {
+      return res.status(400).json({
+        success: false,
+        message: 'Datos incompletos'
+      });
+    }
+
+    // Get current user info
+    const userResult = await pool.query('SELECT * FROM enfermeros WHERE id = $1', [req.session.enfermero_id]);
+
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: 'Usuario no encontrado'
+      });
+    }
+
+    const user = userResult.rows[0];
+    const validPassword = await bcrypt.compare(claveActual, user.clave);
+
+    if (!validPassword) {
+      return res.status(400).json({
+        success: false,
+        message: 'Contraseña actual incorrecta'
+      });
+    }
+
+    // Hash new password and update
+    const hashedNewPassword = await bcrypt.hash(nuevaClave, 10);
+
+    await pool.query(
+      'UPDATE enfermeros SET clave = $1, debe_cambiar_clave = false WHERE id = $2',
+      [hashedNewPassword, req.session.enfermero_id]
+    );
+
+    // Clear session to force re-login
+    req.session.destroy((err) => {
+      if (err) {
+        console.error('Error destroying session:', err);
+      }
+    });
 
     res.json({
       success: true,
@@ -723,7 +784,7 @@ app.post('/api/pacientes/:paciente_id/medicamentos', requireAuth, async (req, re
 // User management routes (admin only)
 app.get('/api/admin/usuarios', requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, codigo, nombre, apellidos, turno, activo FROM enfermeros ORDER BY nombre');
+    const result = await pool.query('SELECT id, codigo, nombre, apellidos, turno, activo, debe_cambiar_clave FROM enfermeros ORDER BY nombre');
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching usuarios:', error);
@@ -757,24 +818,24 @@ app.post('/api/admin/usuarios', requireAdmin, async (req, res) => {
 app.put('/api/admin/usuarios/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { codigo, clave, nombre, apellidos, turno, activo } = req.body;
+    const { codigo, clave, nombre, apellidos, turno, activo, debe_cambiar_clave } = req.body;
 
     let query = `
       UPDATE enfermeros
-      SET codigo = $1, nombre = $2, apellidos = $3, turno = $4, activo = $5
+      SET codigo = $1, nombre = $2, apellidos = $3, turno = $4, activo = $5, debe_cambiar_clave = $6
     `;
-    let params = [codigo, nombre, apellidos, turno, activo, id];
+    let params = [codigo, nombre, apellidos, turno, activo, debe_cambiar_clave, id];
 
     if (clave && clave.trim() !== '') {
       const hashedPassword = await bcrypt.hash(clave, 10);
       query = `
         UPDATE enfermeros
-        SET codigo = $1, clave = $2, nombre = $3, apellidos = $4, turno = $5, activo = $6
-        WHERE id = $7 RETURNING id, codigo, nombre, apellidos, turno, activo
+        SET codigo = $1, clave = $2, nombre = $3, apellidos = $4, turno = $5, activo = $6, debe_cambiar_clave = $7
+        WHERE id = $8 RETURNING id, codigo, nombre, apellidos, turno, activo, debe_cambiar_clave
       `;
-      params = [codigo, hashedPassword, nombre, apellidos, turno, activo, id];
+      params = [codigo, hashedPassword, nombre, apellidos, turno, activo, debe_cambiar_clave, id];
     } else {
-      query += ` WHERE id = $6 RETURNING id, codigo, nombre, apellidos, turno, activo`;
+      query += ` WHERE id = $7 RETURNING id, codigo, nombre, apellidos, turno, activo, debe_cambiar_clave`;
     }
 
     const result = await pool.query(query, params);
