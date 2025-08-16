@@ -1,9 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import axios from 'axios';
-
-// Configure axios globally to include credentials
-axios.defaults.withCredentials = true;
 import Navbar from './components/Navbar';
 import Login from './components/Login';
 import Dashboard from './components/Dashboard';
@@ -19,7 +16,10 @@ import MantenimientoUsuarios from './components/MantenimientoUsuarios';
 import ConfiguracionSistema from './components/ConfiguracionSistema';
 import ImprimirNotas from './components/ImprimirNotas';
 import CambiarClave from './components/CambiarClave';
-import NotasActuales from './components/NotasActuales'; // Assuming NotasActuales component is in this path
+import NotasActuales from './components/NotasActuales';
+
+// Configure axios globally to include credentials
+axios.defaults.withCredentials = true;
 
 // Simple axios setup - only relative URLs
 axios.defaults.withCredentials = true;
