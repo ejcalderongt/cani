@@ -427,7 +427,7 @@ function ImprimirNotas() {
                   <th style="border-right: 1px solid #000; padding: 5px; width: 10%; text-align: center; font-size: 10px;">Fecha</th>
                   <th style="border-right: 1px solid #000; padding: 5px; width: 7%; text-align: center; font-size: 10px;">Hora</th>
                   <th style="border-right: 1px solid #000; padding: 5px; width: 63%; text-align: center; font-size: 10px;">Observaciones y Cuidados de Enfermería</th>
-                  <th style="padding: 5px; width: 20%; text-align: center; font-size: 10px;">Nombre y Firma</th>
+                  <th style="padding: 5px; width: 20%; text-align: center; font-size: 10px;">Nombre</th>
                 </tr>
               </thead>
               <tbody>
@@ -488,12 +488,7 @@ function ImprimirNotas() {
                       </td>
                       <td style="border: 1px solid #000; padding: 5px; vertical-align: top; text-align: center; font-size: 8px;">
                         <div style="min-height: 30px;">
-                          <div style="margin-bottom: 20px;">
-                            ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
-                          </div>
-                          <div style="border-top: 1px solid #000; padding-top: 2px;">
-                            Firma
-                          </div>
+                          ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
                         </div>
                       </td>
                     </tr>

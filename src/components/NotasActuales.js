@@ -149,9 +149,7 @@ function NotasActuales() {
             <td style="text-align: center;">${nota.horaFormateada}</td>
             <td>${observacionesLimpias.replace(/\n/g, '<br>')}</td>
             <td style="text-align: center;">
-              <div style="min-height: 20px;">
-                ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
-              </div>
+              ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
             </td>
           </tr>
         `;
@@ -301,7 +299,7 @@ function NotasActuales() {
                   <th style="width: 10%;">Fecha</th>
                   <th style="width: 7%;">Hora</th>
                   <th style="width: 63%;">Observaciones y Cuidados de Enfermería</th>
-                  <th style="width: 20%;">Nombre y Firma</th>
+                  <th style="width: 20%;">Nombre</th>
                 </tr>
               </thead>
               <tbody>
