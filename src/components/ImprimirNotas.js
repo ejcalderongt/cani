@@ -676,17 +676,29 @@ function ImprimirNotas() {
             /* Specific styling for simplified format */
             .notes-section td {
               border-right: 1px solid #000; /* Keep vertical lines for all columns */
+              border-left: none;
               border-bottom: none; /* Remove horizontal lines */
               border-top: none;
+              padding: 5px;
+              vertical-align: top;
+              font-size: 9px;
             }
-            .notes-section tr:first-child td {
-              border-top: none;
+            .notes-section td:first-child {
+              border-left: none;
+            }
+            .notes-section tr {
+              border-bottom: none;
             }
             .notes-section table {
               border: 2px solid #000; /* Keep outer border */
+              border-collapse: collapse;
             }
             .notes-section th {
               border: 1px solid #000; /* Keep header borders */
+            }
+            .notes-section tbody tr td {
+              border-bottom: none !important;
+              border-top: none !important;
             }
             @media print {
               body { margin: 0; }
