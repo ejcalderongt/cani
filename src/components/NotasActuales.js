@@ -149,11 +149,8 @@ function NotasActuales() {
             <td style="text-align: center;">${nota.horaFormateada}</td>
             <td>${observacionesLimpias.replace(/\n/g, '<br>')}</td>
             <td style="text-align: center;">
-              <div style="margin-bottom: 20px;">
+              <div style="min-height: 20px;">
                 ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
-              </div>
-              <div style="border-top: 1px solid #000; padding-top: 2px;">
-                Firma
               </div>
             </td>
           </tr>
@@ -232,13 +229,18 @@ function NotasActuales() {
               font-size: 9px;
               ${formatoImpresion === 'con-lineas' ? '' : 'border-bottom: 1px solid #eee;'} /* Add subtle line for simplified if needed */
             }
-            /* Specific styling for simplified format to remove internal borders */
+            /* Specific styling for simplified format */
             ${formatoImpresion === 'simplificado' ? `
-              .notes-section td:not(:last-child) {
-                border-right: none;
+              .notes-section td {
+                border-right: 1px solid #000; /* Keep vertical lines for columns */
+                border-bottom: none; /* Remove horizontal lines */
+                border-top: none;
               }
-              .notes-section tr:not(:last-child) td {
-                border-bottom: none;
+              .notes-section td:last-child {
+                border-right: none; /* No border on last column */
+              }
+              .notes-section tr:first-child td {
+                border-top: none;
               }
               .notes-section table {
                 border: 2px solid #000; /* Keep outer border */

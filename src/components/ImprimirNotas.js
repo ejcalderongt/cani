@@ -405,19 +405,19 @@ function ImprimirNotas() {
                   try {
                     if (nota.fecha) {
                       let fechaToProcess = nota.fecha;
-                      
+
                       // Remove time part if present
                       if (fechaToProcess && fechaToProcess.includes('T')) {
                         fechaToProcess = fechaToProcess.split('T')[0];
                       }
-                      
+
                       // Parse date correctly
                       if (fechaToProcess && fechaToProcess.match(/^\d{4}-\d{2}-\d{2}$/)) {
                         const fechaParts = fechaToProcess.split('-');
                         const year = parseInt(fechaParts[0], 10);
                         const month = parseInt(fechaParts[1], 10) - 1;
                         const day = parseInt(fechaParts[2], 10);
-                        
+
                         if (year > 1900 && year < 2100 && month >= 0 && month < 12 && day >= 1 && day <= 31) {
                           const fechaObj = new Date(year, month, day);
                           if (fechaObj.getFullYear() === year && fechaObj.getMonth() === month && fechaObj.getDate() === day) {
@@ -672,6 +672,24 @@ function ImprimirNotas() {
               border: 2px solid #000;
               padding: 10px;
               page-break-inside: avoid;
+            }
+            /* Specific styling for simplified format */
+            .notes-section td {
+              border-right: 1px solid #000; /* Keep vertical lines for columns */
+              border-bottom: none; /* Remove horizontal lines */
+              border-top: none;
+            }
+            .notes-section td:last-child {
+              border-right: none; /* No border on last column */
+            }
+            .notes-section tr:first-child td {
+              border-top: none;
+            }
+            .notes-section table {
+              border: 2px solid #000; /* Keep outer border */
+            }
+            .notes-section th {
+              border: 1px solid #000; /* Keep header borders */
             }
             @media print {
               body { margin: 0; }
