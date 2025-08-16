@@ -173,12 +173,21 @@ function NotasActuales() {
           <meta charset="utf-8">
           <title>Notas de Enfermería - ${paciente?.nombre} ${paciente?.apellidos}</title>
           <style>
+            @page {
+              size: letter;
+              margin: 15mm;
+              border: 2px solid #000;
+            }
             body {
               font-family: 'Times New Roman', serif;
-              margin: 10mm;
+              margin: 0;
+              padding: 15mm;
               font-size: 10px;
               line-height: 1.2;
               color: #000;
+              border: 2px solid #000;
+              min-height: calc(100vh - 30mm);
+              box-sizing: border-box;
             }
             .header {
               text-align: center;
@@ -220,45 +229,27 @@ function NotasActuales() {
               text-align: center;
               font-size: 10px;
             }
-            ${formatoImpresion === 'con-lineas' ? `
-              .notes-section td {
-                border-right: 1px solid #000; /* Keep vertical lines */
-                border-left: 1px solid #000; /* Keep vertical lines */
-                border-bottom: none; /* Remove horizontal lines between rows */
-                border-top: none; /* Remove horizontal lines between rows */
-                padding: 5px;
-                vertical-align: top;
-                font-size: 9px;
-              }
-              .notes-section tbody tr:first-child td {
-                border-top: 1px solid #000; /* Keep top border for first row */
-              }
-              .notes-section tbody tr:last-child td {
-                border-bottom: 1px solid #000; /* Keep bottom border for last row */
-              }
-              .notes-section td:first-child {
-                border-left: 1px solid #000; /* Ensure left border on first column */
-              }
-              .notes-section td:last-child {
-                border-right: 1px solid #000; /* Ensure right border on last column */
-              }
-            ` : `
-              .notes-section td {
-                border-right: 1px solid #000; /* Keep vertical lines */
-                border-left: 1px solid #000; /* Keep vertical lines */
-                border-bottom: none; /* Remove horizontal lines */
-                border-top: none; /* Remove horizontal lines */
-                padding: 5px;
-                vertical-align: top;
-                font-size: 9px;
-              }
-              .notes-section tbody tr:first-child td {
-                border-top: 1px solid #000; /* Keep top border for first row */
-              }
-              .notes-section tbody tr:last-child td {
-                border-bottom: 1px solid #000; /* Keep bottom border for last row */
-              }
-            `}
+            .notes-section td {
+              border-right: 1px solid #000; /* Keep vertical lines */
+              border-left: 1px solid #000; /* Keep vertical lines */
+              border-bottom: none; /* Remove horizontal lines between rows */
+              border-top: none; /* Remove horizontal lines between rows */
+              padding: 5px;
+              vertical-align: top;
+              font-size: 9px;
+            }
+            .notes-section tbody tr:first-child td {
+              border-top: 1px solid #000; /* Keep top border for first row */
+            }
+            .notes-section tbody tr:last-child td {
+              border-bottom: 1px solid #000; /* Keep bottom border for last row */
+            }
+            .notes-section td:first-child {
+              border-left: 1px solid #000; /* Ensure left border on first column */
+            }
+            .notes-section td:last-child {
+              border-right: 1px solid #000; /* Ensure right border on last column */
+            }
             @media print {
               body { 
                 margin: 0; 
