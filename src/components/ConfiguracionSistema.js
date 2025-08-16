@@ -12,15 +12,41 @@ function ConfiguracionSistema() {
     setLoading(true);
     setError('');
     setSuccess('');
+    setShowConfirmModal(false);
 
     try {
+      // Verificar estado de autenticación primero
+      const statusResponse = await axios.get('/api/status', {
+        withCredentials: true,
+        timeout: 10000
+      });
+
+      if (!statusResponse.data.authenticated) {
+        setError('Sesión expirada. Por favor, inicie sesión nuevamente.');
+        window.location.href = '/login';
+        return;
+      }
+
       const response = await axios.post('/api/admin/reset-database', {}, {
-        withCredentials: true
+        withCredentials: true,
+        timeout: 15000
       });
       setSuccess(response.data.message);
-      setShowConfirmModal(false);
     } catch (error) {
-      setError(error.response?.data?.error || 'Error al reinicializar la base de datos');
+      console.error('Error resetting database:', error);
+
+      if (error.response?.status === 401) {
+        setError('No tiene autorización para realizar esta acción. Inicie sesión nuevamente.');
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      } else if (error.response?.status === 403) {
+        setError('Solo los administradores pueden reinicializar la base de datos.');
+      } else if (error.code === 'ECONNABORTED') {
+        setError('La operación tardó demasiado tiempo. Intente nuevamente.');
+      } else {
+        setError(error.response?.data?.error || 'Error al reinicializar la base de datos');
+      }
     } finally {
       setLoading(false);
     }
@@ -35,7 +61,7 @@ function ConfiguracionSistema() {
   };
 
   const insertSampleData = async () => {
-    if (!window.confirm('¿Está seguro de que desea cargar datos de ejemplo? Esto añadirá pacientes y notas de prueba.')) {
+    if (!window.confirm('¿Está seguro de que desea cargar los datos de ejemplo? Esta acción añadirá pacientes y notas de prueba.')) {
       return;
     }
 
@@ -44,12 +70,38 @@ function ConfiguracionSistema() {
     setSuccess('');
 
     try {
+      // Verificar estado de autenticación primero
+      const statusResponse = await axios.get('/api/status', {
+        withCredentials: true,
+        timeout: 10000
+      });
+
+      if (!statusResponse.data.authenticated) {
+        setError('Sesión expirada. Por favor, inicie sesión nuevamente.');
+        window.location.href = '/login';
+        return;
+      }
+
       const response = await axios.post('/api/admin/insert-sample-data', {}, {
-        withCredentials: true
+        withCredentials: true,
+        timeout: 15000
       });
       setSuccess(response.data.message);
     } catch (error) {
-      setError(error.response?.data?.error || 'Error al insertar los datos de ejemplo');
+      console.error('Error inserting sample data:', error);
+
+      if (error.response?.status === 401) {
+        setError('No tiene autorización para realizar esta acción. Inicie sesión nuevamente.');
+        setTimeout(() => {
+          window.location.href = '/login';
+        }, 2000);
+      } else if (error.response?.status === 403) {
+        setError('Solo los administradores pueden cargar datos de ejemplo.');
+      } else if (error.code === 'ECONNABORTED') {
+        setError('La operación tardó demasiado tiempo. Intente nuevamente.');
+      } else {
+        setError(error.response?.data?.error || 'Error al insertar los datos de ejemplo');
+      }
     } finally {
       setLoading(false);
     }
