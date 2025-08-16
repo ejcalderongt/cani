@@ -1298,6 +1298,11 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
 
     // Only insert notes if we have patients
     if (Object.keys(pacientes).length > 0) {
+      // Ensure we have valid IDs
+      const validPacienteId1 = pacientes['EXP001'] || Object.values(pacientes)[0] || 1;
+      const validPacienteId2 = pacientes['EXP002'] || Object.values(pacientes)[1] || validPacienteId1;
+      const validPacienteId3 = pacientes['EXP003'] || Object.values(pacientes)[2] || validPacienteId1;
+
       // Insert sample nursing notes with proper error handling
       try {
         await pool.query(`
@@ -1311,22 +1316,22 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
           ($21, $22, $23, $24, $25),
           ($26, $27, $28, $29, $30)
         `, [
-          '2025-01-15', '08:00', pacientes['EXP001'] || 1, enfermeroIds[0],
+          '2025-01-15', '08:00', validPacienteId1, enfermeroIds[0],
           'Paciente despertó tranquilo. Signos vitales estables. Refiere haber dormido bien durante la noche. Se muestra colaborador con el personal. Presenta buen estado de ánimo. Solicita hablar con su familia.',
 
-          '2025-01-15', '14:30', pacientes['EXP001'] || 1, enfermeroIds[1] || enfermeroIds[0],
+          '2025-01-15', '14:30', validPacienteId1, enfermeroIds[1] || enfermeroIds[0],
           'Durante la tarde el paciente participó activamente en la terapia grupal. Mostró buena disposición para compartir sus experiencias. Come adecuadamente. No presenta náuseas ni vómitos. Hidratación oral adecuada.',
 
-          '2025-01-15', '22:00', pacientes['EXP001'] || 1, enfermeroIds[0],
+          '2025-01-15', '22:00', validPacienteId1, enfermeroIds[0],
           'Turno nocturno tranquilo. Paciente cena completamente. Ve televisión en sala común hasta las 21:00 hrs. Se retira a su habitación sin dificultad. Refiere sentirse ansioso pero controlado.',
 
-          '2025-01-15', '09:15', pacientes['EXP002'] || 1, enfermeroIds[1] || enfermeroIds[0],
+          '2025-01-15', '09:15', validPacienteId2, enfermeroIds[1] || enfermeroIds[0],
           'Paciente presenta episodio de llanto al despertar. Refiere pesadillas recurrentes. Signos vitales: TA 110/70, FC 88, FR 18, Temp 36.8°C. Acepta desayuno parcialmente. Se muestra retraída al contacto social.',
 
-          '2025-01-15', '16:45', pacientes['EXP002'] || 1, enfermeroIds[0],
+          '2025-01-15', '16:45', validPacienteId2, enfermeroIds[0],
           'Mejoría notable después de sesión terapéutica. Paciente más comunicativa y participativa. Realizó actividades de arte-terapia. Buen apetito durante la merienda. Interactúa positivamente con otras pacientes.',
 
-          '2025-01-16', '08:30', pacientes['EXP003'] || 1, enfermeroIds[2] || enfermeroIds[0],
+          '2025-01-16', '08:30', validPacienteId3, enfermeroIds[2] || enfermeroIds[0],
           'Paciente acude puntual a cita de seguimiento. Refiere adherencia al tratamiento ambulatorio. Examen físico sin hallazgos significativos. Laboratorios pendientes de resultado. Peso estable.'
         ]);
       } catch (notasError) {
@@ -1344,9 +1349,9 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
           ($3, $4, 110, 70, 99.0, 88, 36.8, 'Ligera taquicardia, relacionada con ansiedad'),
           ($5, $6, 140, 90, 97.8, 76, 36.4, 'Hipertensión leve, requiere seguimiento')
         `, [
-          pacientes['EXP001'] || 1, enfermeroIds[0], 
-          pacientes['EXP002'] || 1, enfermeroIds[1] || enfermeroIds[0],
-          pacientes['EXP003'] || 1, enfermeroIds[2] || enfermeroIds[0]
+          validPacienteId1, enfermeroIds[0], 
+          validPacienteId2, enfermeroIds[1] || enfermeroIds[0],
+          validPacienteId3, enfermeroIds[2] || enfermeroIds[0]
         ]);
       } catch (signosError) {
         console.warn('Error inserting vital signs (may already exist):', signosError.message);
