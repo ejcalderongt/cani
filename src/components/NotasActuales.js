@@ -10,7 +10,7 @@ function NotasActuales() {
   const [selectedNota, setSelectedNota] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [pacientes, setPacientes] = useState([]);
-  const [formatoImpresion, setFormatoImpresion] = useState('con-lineas'); // Added state for print format
+  const [formatoImpresion] = useState('con-lineas'); // Only official format
   const navigate = useNavigate();
 
   // Set default dates (yesterday and today)
@@ -372,31 +372,7 @@ function NotasActuales() {
               </div>
             </div>
 
-            <div className="row mt-3">
-              <div className="col-12">
-                <Form.Group>
-                  <Form.Label>Formato de Impresión PDF</Form.Label>
-                  <div className="d-flex gap-3">
-                    <Form.Check
-                      type="radio"
-                      id="formato-con-lineas-actual"
-                      name="formatoActual"
-                      label="Con líneas divisorias (Formato oficial)"
-                      checked={formatoImpresion === 'con-lineas'}
-                      onChange={() => setFormatoImpresion('con-lineas')}
-                    />
-                    <Form.Check
-                      type="radio"
-                      id="formato-simplificado-actual"
-                      name="formatoActual"
-                      label="Simplificado (Sin líneas divisorias)"
-                      checked={formatoImpresion === 'simplificado'}
-                      onChange={() => setFormatoImpresion('simplificado')}
-                    />
-                  </div>
-                </Form.Group>
-              </div>
-            </div>
+            
           </Form>
         </Card.Body>
       </Card>
