@@ -3,7 +3,16 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 
 function Dashboard() {
-  const [stats, setStats] = useState(null);
+  const [stats, setStats] = useState({
+    totalPacientes: 0,
+    pacientesActivos: 0,
+    totalNotas: 0,
+    notasHoy: 0,
+    totalMedicamentos: 0
+  });
+  const [hospitalConfig, setHospitalConfig] = useState({
+    nombre_hospital: 'Sistema Hospitalario'
+  });
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -114,7 +123,28 @@ function Dashboard() {
     };
 
     fetchDashboardData();
+    fetchHospitalConfig();
+
+    // Listen for hospital config updates
+    const handleConfigUpdate = (event) => {
+      setHospitalConfig(event.detail);
+    };
+
+    window.addEventListener('hospitalConfigUpdated', handleConfigUpdate);
+
+    return () => {
+      window.removeEventListener('hospitalConfigUpdated', handleConfigUpdate);
+    };
   }, []); // Only run once
+
+  const fetchHospitalConfig = async () => {
+    try {
+      const response = await axios.get('/api/configuracion-hospital');
+      setHospitalConfig(response.data);
+    } catch (error) {
+      console.error('Error fetching hospital config:', error);
+    }
+  };
 
   const quickActions = [
     {
@@ -183,16 +213,11 @@ function Dashboard() {
   return (
     <div className="container" style={{ paddingTop: 'var(--space-8)', paddingBottom: 'var(--space-8)' }}>
       {/* Header */}
-      <div style={{ marginBottom: 'var(--space-8)' }}>
-        <h1 style={{ marginBottom: 'var(--space-2)' }}>Panel de Control</h1>
-        <p className="text-muted">
-          Resumen general del sistema de la Clínica de Tratamiento de Adicciones - {new Date().toLocaleDateString('es-ES', { 
-            weekday: 'long', 
-            year: 'numeric', 
-            month: 'long', 
-            day: 'numeric' 
-          })}
-        </p>
+      <div className="d-flex justify-content-between align-items-center mb-4">
+        <div>
+          <h1>Panel de Control</h1>
+          <p className="text-muted">{hospitalConfig.nombre_hospital} - Resumen General</p>
+        </div>
       </div>
 
       {/* KPI Cards */}

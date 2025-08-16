@@ -272,6 +272,29 @@ async function initDatabase() {
       )
     `);
 
+    // Create configuracion_hospital table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS configuracion_hospital (
+        id SERIAL PRIMARY KEY,
+        nombre_hospital VARCHAR(200) NOT NULL DEFAULT 'Sistema Hospitalario',
+        logo_base64 TEXT,
+        direccion TEXT,
+        telefono VARCHAR(50),
+        email VARCHAR(100),
+        sitio_web VARCHAR(200),
+        fecha_actualizacion TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Insert default hospital configuration if not exists
+    const configExists = await pool.query('SELECT id FROM configuracion_hospital LIMIT 1');
+    if (configExists.rows.length === 0) {
+      await pool.query(`
+        INSERT INTO configuracion_hospital (nombre_hospital, direccion, telefono)
+        VALUES ($1, $2, $3)
+      `, ['Sistema Hospitalario', '', '']);
+    }
+
     // Add columns to existing tables if they don't exist
     try {
       // Add debe_cambiar_password column to enfermeros
@@ -1321,6 +1344,64 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
     await pool.query('ROLLBACK');
     console.error('Error inserting sample data:', error);
     res.status(500).json({ error: 'Error al insertar los datos de ejemplo' });
+  }
+});
+
+// Hospital configuration endpoints
+app.get('/api/configuracion-hospital', async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM configuracion_hospital ORDER BY id LIMIT 1');
+    
+    if (result.rows.length === 0) {
+      // Return default configuration if none exists
+      return res.json({
+        id: null,
+        nombre_hospital: 'Sistema Hospitalario',
+        logo_base64: null,
+        direccion: '',
+        telefono: '',
+        email: '',
+        sitio_web: ''
+      });
+    }
+    
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching hospital configuration:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.put('/api/configuracion-hospital', requireAdmin, async (req, res) => {
+  try {
+    const { nombre_hospital, logo_base64, direccion, telefono, email, sitio_web } = req.body;
+
+    // Check if configuration exists
+    const existingConfig = await pool.query('SELECT id FROM configuracion_hospital LIMIT 1');
+
+    let result;
+    if (existingConfig.rows.length === 0) {
+      // Insert new configuration
+      result = await pool.query(`
+        INSERT INTO configuracion_hospital (nombre_hospital, logo_base64, direccion, telefono, email, sitio_web)
+        VALUES ($1, $2, $3, $4, $5, $6)
+        RETURNING *
+      `, [nombre_hospital, logo_base64, direccion, telefono, email, sitio_web]);
+    } else {
+      // Update existing configuration
+      result = await pool.query(`
+        UPDATE configuracion_hospital
+        SET nombre_hospital = $1, logo_base64 = $2, direccion = $3, telefono = $4, 
+            email = $5, sitio_web = $6, fecha_actualizacion = CURRENT_TIMESTAMP
+        WHERE id = $7
+        RETURNING *
+      `, [nombre_hospital, logo_base64, direccion, telefono, email, sitio_web, existingConfig.rows[0].id]);
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating hospital configuration:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
   }
 });
 

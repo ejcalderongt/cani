@@ -14,6 +14,7 @@ import Medicamentos from './components/Medicamentos';
 import NuevoMedicamento from './components/NuevoMedicamento';
 import MantenimientoUsuarios from './components/MantenimientoUsuarios';
 import ConfiguracionSistema from './components/ConfiguracionSistema';
+import ConfiguracionHospital from './components/ConfiguracionHospital';
 import ImprimirNotas from './components/ImprimirNotas';
 import CambiarClave from './components/CambiarClave';
 import NotasActuales from './components/NotasActuales';
@@ -164,6 +165,13 @@ function App() {
             path="/admin/usuarios"
             element={
               enfermero?.codigo === 'admin' ? <MantenimientoUsuarios /> : <Navigate to="/" />
+            }
+          />
+
+          <Route
+            path="/admin/hospital"
+            element={
+              enfermero?.codigo === 'admin' ? <ConfiguracionHospital /> : <Navigate to="/" />
             }
           />
 
