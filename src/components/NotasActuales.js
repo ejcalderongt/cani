@@ -145,10 +145,10 @@ function NotasActuales() {
 
         const rowContent = `
           <tr>
-            <td style="text-align: center;">${nota.fechaFormateada}</td>
-            <td style="text-align: center;">${nota.horaFormateada}</td>
-            <td>${observacionesLimpias.replace(/\n/g, '<br>')}</td>
-            <td style="text-align: center;">
+            <td style="text-align: center; border-left: 1px solid #000; border-right: 1px solid #000; padding: 5px; vertical-align: top;">${nota.fechaFormateada}</td>
+            <td style="text-align: center; border-right: 1px solid #000; padding: 5px; vertical-align: top;">${nota.horaFormateada}</td>
+            <td style="border-right: 1px solid #000; padding: 5px; vertical-align: top;">${observacionesLimpias.replace(/\n/g, '<br>')}</td>
+            <td style="text-align: center; border-right: 1px solid #000; padding: 5px; vertical-align: top;">
               ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
             </td>
           </tr>

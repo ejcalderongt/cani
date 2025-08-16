@@ -474,17 +474,17 @@ function ImprimirNotas() {
                   }
 
                   return `
-                    <tr style="border-bottom: 1px solid #000;">
-                      <td style="border: 1px solid #000; padding: 5px; vertical-align: top; text-align: center; font-size: 9px;">
+                    <tr>
+                      <td style="border-left: 1px solid #000; border-right: 1px solid #000; padding: 5px; vertical-align: top; text-align: center; font-size: 9px;">
                         ${fechaMostrar}
                       </td>
-                      <td style="border: 1px solid #000; padding: 5px; vertical-align: top; text-align: center; font-size: 9px;">
+                      <td style="border-right: 1px solid #000; padding: 5px; vertical-align: top; text-align: center; font-size: 9px;">
                         ${nota.horaFormateada}
                       </td>
-                      <td style="border: 1px solid #000; padding: 5px; vertical-align: top; font-size: 9px; line-height: 1.3;">
+                      <td style="border-right: 1px solid #000; padding: 5px; vertical-align: top; font-size: 9px; line-height: 1.3;">
                         ${observacionesLimpias.replace(/\n/g, '<br>')}
                       </td>
-                      <td style="border: 1px solid #000; padding: 5px; vertical-align: top; text-align: center; font-size: 8px;">
+                      <td style="border-right: 1px solid #000; padding: 5px; vertical-align: top; text-align: center; font-size: 8px;">
                         <div style="min-height: 30px;">
                           ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
                         </div>
@@ -495,11 +495,11 @@ function ImprimirNotas() {
 
                 <!-- Líneas adicionales para llenar la página si es necesario -->
                 ${Array(Math.max(15 - notasFormateadas.length, 0)).fill().map(() => `
-                  <tr style="border-bottom: 1px solid #000; height: 40px;">
-                    <td style="border: 1px solid #000; padding: 5px;"></td>
-                    <td style="border: 1px solid #000; padding: 5px;"></td>
-                    <td style="border: 1px solid #000; padding: 5px; background-image: repeating-linear-gradient(transparent, transparent 12px, #eee 12px, #eee 13px);"></td>
-                    <td style="border: 1px solid #000; padding: 5px;"></td>
+                  <tr style="height: 40px;">
+                    <td style="border-left: 1px solid #000; border-right: 1px solid #000; padding: 5px;"></td>
+                    <td style="border-right: 1px solid #000; padding: 5px;"></td>
+                    <td style="border-right: 1px solid #000; padding: 5px; background-image: repeating-linear-gradient(transparent, transparent 12px, #eee 12px, #eee 13px);"></td>
+                    <td style="border-right: 1px solid #000; padding: 5px;"></td>
                   </tr>
                 `).join('')}
               </tbody>
