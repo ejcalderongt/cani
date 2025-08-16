@@ -302,6 +302,47 @@ function ImprimirNotas() {
               .footer { page-break-before: avoid; }
             }
           </style>
+          <style>
+            ${formatoImpresion === 'con-lineas' ? `
+              .notes-section td {
+                border-right: 1px solid #000; /* Keep vertical lines */
+                border-left: 1px solid #000; /* Keep vertical lines */
+                border-bottom: none; /* Remove horizontal lines between rows */
+                border-top: none; /* Remove horizontal lines between rows */
+                padding: 5px;
+                vertical-align: top;
+                font-size: 9px;
+              }
+              .notes-section tbody tr:first-child td {
+                border-top: 1px solid #000; /* Keep top border for first row */
+              }
+              .notes-section tbody tr:last-child td {
+                border-bottom: 1px solid #000; /* Keep bottom border for last row */
+              }
+              .notes-section td:first-child {
+                border-left: 1px solid #000; /* Ensure left border on first column */
+              }
+              .notes-section td:last-child {
+                border-right: 1px solid #000; /* Ensure right border on last column */
+              }
+            ` : `
+              .notes-section td {
+                border-right: 1px solid #000; /* Keep vertical lines */
+                border-left: 1px solid #000; /* Keep vertical lines */
+                border-bottom: none; /* Remove horizontal lines */
+                border-top: none; /* Remove horizontal lines */
+                padding: 5px;
+                vertical-align: top;
+                font-size: 9px;
+              }
+              .notes-section tbody tr:first-child td {
+                border-top: 1px solid #000; /* Keep top border for first row */
+              }
+              .notes-section tbody tr:last-child td {
+                border-bottom: 1px solid #000; /* Keep bottom border for last row */
+              }
+            `}
+          </style>
         </head>
         <body>
           <div class="header">
