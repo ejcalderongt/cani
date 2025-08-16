@@ -244,7 +244,6 @@ function ImprimirNotas() {
             @page {
               size: letter;
               margin: 15mm;
-              border: 2px solid #000;
             }
             body {
               font-family: 'Times New Roman', serif;
@@ -253,7 +252,6 @@ function ImprimirNotas() {
               font-size: 10px;
               line-height: 1.2;
               color: #000;
-              border: 2px solid #000;
               min-height: calc(100vh - 30mm);
               box-sizing: border-box;
             }
