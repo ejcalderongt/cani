@@ -14,7 +14,9 @@ function ConfiguracionSistema() {
     setSuccess('');
 
     try {
-      const response = await axios.post('/api/admin/reset-database');
+      const response = await axios.post('/api/admin/reset-database', {}, {
+        withCredentials: true
+      });
       setSuccess(response.data.message);
       setShowConfirmModal(false);
     } catch (error) {
@@ -33,7 +35,7 @@ function ConfiguracionSistema() {
   };
 
   const insertSampleData = async () => {
-    if (!window.confirm('¿Desea cargar datos de ejemplo en el sistema? Esto creará pacientes, notas de enfermería y otros registros de prueba.')) {
+    if (!window.confirm('¿Está seguro de que desea cargar datos de ejemplo? Esto añadirá pacientes y notas de prueba.')) {
       return;
     }
 
@@ -42,7 +44,9 @@ function ConfiguracionSistema() {
     setSuccess('');
 
     try {
-      const response = await axios.post('/api/admin/insert-sample-data');
+      const response = await axios.post('/api/admin/insert-sample-data', {}, {
+        withCredentials: true
+      });
       setSuccess(response.data.message);
     } catch (error) {
       setError(error.response?.data?.error || 'Error al insertar los datos de ejemplo');
