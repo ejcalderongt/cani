@@ -435,20 +435,8 @@ task = "shell.exec"
 args = "NODE_ENV=production PORT=80 node server.js"
 
 [[ports]]
-localPort = 3000
-externalPort = 3000
-
-[[ports]]
-localPort = 3001
-externalPort = 3001
-
-[[ports]]
-localPort = 5000
+localPort = 80
 externalPort = 80
-
-[[ports]]
-localPort = 5001
-externalPort = 3002
 
 [deployment]
 deploymentTarget = "cloudrun"
