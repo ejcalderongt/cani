@@ -260,7 +260,26 @@ function NotasActuales() {
               }
             `}
             @media print {
-              body { margin: 0; }
+              body { 
+                margin: 0; 
+                -webkit-print-color-adjust: exact;
+                print-color-adjust: exact;
+              }
+              .header { 
+                page-break-after: avoid;
+                margin-bottom: 15px;
+              }
+              .patient-info { 
+                page-break-after: avoid;
+                margin-bottom: 15px;
+              }
+              .form-header {
+                page-break-after: avoid;
+                margin-bottom: 15px;
+              }
+              .notes-section {
+                page-break-inside: auto;
+              }
             }
           </style>
         </head>
@@ -308,14 +327,12 @@ function NotasActuales() {
             </table>
           </div>
 
-          <div style="margin-top: 30px; text-align: center; font-size: 8px; color: #666;">
+          <div style="margin-top: 25px; text-align: center; font-size: 8px; color: #666; padding-top: 10px;">
             Documento generado automáticamente el ${fechaImpresion}<br>
             Sistema Hospitalario - Notas de Enfermería
           </div>
 
-          <!-- Bottom line to define page end -->
-          <div style="margin-top: 30px; border-bottom: 3px solid #000; padding-bottom: 10px;"></div>
-        </body>
+          </body>
       </html>
     `;
   };
