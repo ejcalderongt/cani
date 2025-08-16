@@ -232,12 +232,9 @@ function NotasActuales() {
             /* Specific styling for simplified format */
             ${formatoImpresion === 'simplificado' ? `
               .notes-section td {
-                border-right: 1px solid #000; /* Keep vertical lines for columns */
+                border-right: 1px solid #000; /* Keep vertical lines for all columns */
                 border-bottom: none; /* Remove horizontal lines */
                 border-top: none;
-              }
-              .notes-section td:last-child {
-                border-right: none; /* No border on last column */
               }
               .notes-section tr:first-child td {
                 border-top: none;

@@ -675,12 +675,9 @@ function ImprimirNotas() {
             }
             /* Specific styling for simplified format */
             .notes-section td {
-              border-right: 1px solid #000; /* Keep vertical lines for columns */
+              border-right: 1px solid #000; /* Keep vertical lines for all columns */
               border-bottom: none; /* Remove horizontal lines */
               border-top: none;
-            }
-            .notes-section td:last-child {
-              border-right: none; /* No border on last column */
             }
             .notes-section tr:first-child td {
               border-top: none;
@@ -702,7 +699,7 @@ function ImprimirNotas() {
         <body>
           <div class="header">
             <h1>SISTEMA HOSPITALARIO</h1>
-            <h2>NOTAS DE ENFERMERÍA - FORMATO SIMPLIFICADO</h2>
+            <h2>NOTAS DE ENFERMERÍA</h2>
           </div>
 
           <div class="patient-info">
