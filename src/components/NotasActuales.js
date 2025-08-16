@@ -137,30 +137,26 @@ function NotasActuales() {
     });
 
     const buildTableRows = (notas) => {
-      return notas.map((nota) => {
+      return notas.map((nota, index) => {
         const observacionesLimpias = nota.observaciones
           .replace(/\n{3,}/g, '\n\n')
           .replace(/\s{2,}/g, ' ')
           .trim();
 
-        const rowContent = `
+        // Determine if this is the last row to add bottom border
+        const isLastRow = index === notas.length - 1;
+        const bottomBorder = isLastRow ? 'border-bottom: 1px solid #000;' : '';
+
+        return `
           <tr>
-            <td style="text-align: center; border-left: 1px solid #000; border-right: 1px solid #000; padding: 5px; vertical-align: top;">${nota.fechaFormateada}</td>
-            <td style="text-align: center; border-right: 1px solid #000; padding: 5px; vertical-align: top;">${nota.horaFormateada}</td>
-            <td style="border-right: 1px solid #000; padding: 5px; vertical-align: top;">${observacionesLimpias.replace(/\n/g, '<br>')}</td>
-            <td style="text-align: center; border-right: 1px solid #000; padding: 5px; vertical-align: top;">
+            <td style="text-align: center; border-left: 1px solid #000; border-right: 1px solid #000; ${bottomBorder} padding: 5px; vertical-align: top;">${nota.fechaFormateada}</td>
+            <td style="text-align: center; border-right: 1px solid #000; ${bottomBorder} padding: 5px; vertical-align: top;">${nota.horaFormateada}</td>
+            <td style="border-right: 1px solid #000; ${bottomBorder} padding: 5px; vertical-align: top;">${observacionesLimpias.replace(/\n/g, '<br>')}</td>
+            <td style="text-align: center; border-right: 1px solid #000; ${bottomBorder} padding: 5px; vertical-align: top;">
               ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
             </td>
           </tr>
         `;
-
-        if (formatoImpresion === 'con-lineas') {
-          return rowContent;
-        } else {
-          // For simplified format, don't add extra horizontal rules or complex cell structures if not needed
-          // For now, let's just return the content within a single row, no explicit dividing lines between rows
-          return rowContent; // Simplification logic could be more complex if needed
-        }
       }).join('');
     };
 
@@ -230,25 +226,26 @@ function NotasActuales() {
               font-size: 10px;
             }
             .notes-section td {
-              border-right: 1px solid #000; /* Keep vertical lines */
-              border-left: 1px solid #000; /* Keep vertical lines */
-              border-bottom: none; /* Remove horizontal lines between rows */
-              border-top: none; /* Remove horizontal lines between rows */
+              border-right: 1px solid #000;
+              border-left: 1px solid #000;
+              border-bottom: none;
+              border-top: none;
               padding: 5px;
               vertical-align: top;
               font-size: 9px;
             }
             .notes-section tbody tr:first-child td {
-              border-top: 1px solid #000; /* Keep top border for first row */
-            }
-            .notes-section tbody tr:last-child td {
-              border-bottom: 1px solid #000; /* Keep bottom border for last row */
+              border-top: 1px solid #000;
             }
             .notes-section td:first-child {
-              border-left: 1px solid #000; /* Ensure left border on first column */
+              border-left: 1px solid #000;
             }
             .notes-section td:last-child {
-              border-right: 1px solid #000; /* Ensure right border on last column */
+              border-right: 1px solid #000;
+            }
+            .notes-section table {
+              border: 2px solid #000;
+              border-collapse: collapse;
             }
             @media print {
               body { 

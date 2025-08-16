@@ -398,45 +398,28 @@ function ImprimirNotas() {
             }
           </style>
           <style>
-            ${formatoImpresion === 'con-lineas' ? `
-              .notes-section td {
-                border-right: 1px solid #000; /* Keep vertical lines */
-                border-left: 1px solid #000; /* Keep vertical lines */
-                border-bottom: none; /* Remove horizontal lines between rows */
-                border-top: none; /* Remove horizontal lines between rows */
-                padding: 5px;
-                vertical-align: top;
-                font-size: 9px;
-              }
-              .notes-section tbody tr:first-child td {
-                border-top: 1px solid #000; /* Keep top border for first row */
-              }
-              .notes-section tbody tr:last-child td {
-                border-bottom: 1px solid #000; /* Keep bottom border for last row */
-              }
-              .notes-section td:first-child {
-                border-left: 1px solid #000; /* Ensure left border on first column */
-              }
-              .notes-section td:last-child {
-                border-right: 1px solid #000; /* Ensure right border on last column */
-              }
-            ` : `
-              .notes-section td {
-                border-right: 1px solid #000; /* Keep vertical lines */
-                border-left: 1px solid #000; /* Keep vertical lines */
-                border-bottom: none; /* Remove horizontal lines */
-                border-top: none; /* Remove horizontal lines */
-                padding: 5px;
-                vertical-align: top;
-                font-size: 9px;
-              }
-              .notes-section tbody tr:first-child td {
-                border-top: 1px solid #000; /* Keep top border for first row */
-              }
-              .notes-section tbody tr:last-child td {
-                border-bottom: 1px solid #000; /* Keep bottom border for last row */
-              }
-            `}
+            .notes-section td {
+              border-right: 1px solid #000;
+              border-left: 1px solid #000;
+              border-bottom: none;
+              border-top: none;
+              padding: 5px;
+              vertical-align: top;
+              font-size: 9px;
+            }
+            .notes-section tbody tr:first-child td {
+              border-top: 1px solid #000;
+            }
+            .notes-section td:first-child {
+              border-left: 1px solid #000;
+            }
+            .notes-section td:last-child {
+              border-right: 1px solid #000;
+            }
+            .notes-section table {
+              border: 2px solid #000;
+              border-collapse: collapse;
+            }
           </style>
         </head>
         <body>
@@ -526,7 +509,7 @@ function ImprimirNotas() {
                 </tr>
               </thead>
               <tbody>
-                ${notasFormateadas.map((nota) => {
+                ${notasFormateadas.map((nota, index) => {
                   // Limpiar observaciones: máximo 2 enters consecutivos
                   let observacionesLimpias = '';
                   if (nota.observaciones) {
@@ -570,18 +553,22 @@ function ImprimirNotas() {
                     console.error('Error formatting date for table:', error);
                   }
 
+                  // Determine if this is the last row to add bottom border
+                  const isLastRow = index === notasFormateadas.length - 1;
+                  const bottomBorder = isLastRow ? 'border-bottom: 1px solid #000;' : '';
+
                   return `
                     <tr>
-                      <td style="border-left: 1px solid #000; border-right: 1px solid #000; padding: 5px; vertical-align: top; text-align: center; font-size: 9px;">
+                      <td style="border-left: 1px solid #000; border-right: 1px solid #000; ${bottomBorder} padding: 5px; vertical-align: top; text-align: center; font-size: 9px;">
                         ${fechaMostrar}
                       </td>
-                      <td style="border-right: 1px solid #000; padding: 5px; vertical-align: top; text-align: center; font-size: 9px;">
+                      <td style="border-right: 1px solid #000; ${bottomBorder} padding: 5px; vertical-align: top; text-align: center; font-size: 9px;">
                         ${nota.horaFormateada}
                       </td>
-                      <td style="border-right: 1px solid #000; padding: 5px; vertical-align: top; font-size: 9px; line-height: 1.3;">
+                      <td style="border-right: 1px solid #000; ${bottomBorder} padding: 5px; vertical-align: top; font-size: 9px; line-height: 1.3;">
                         ${observacionesLimpias.replace(/\n/g, '<br>')}
                       </td>
-                      <td style="border-right: 1px solid #000; padding: 5px; vertical-align: top; text-align: center; font-size: 8px;">
+                      <td style="border-right: 1px solid #000; ${bottomBorder} padding: 5px; vertical-align: top; text-align: center; font-size: 8px;">
                         <div style="min-height: 30px;">
                           ${nota.enfermero_nombre} ${nota.enfermero_apellidos}
                         </div>
@@ -589,16 +576,6 @@ function ImprimirNotas() {
                     </tr>
                   `;
                 }).join('')}
-
-                <!-- Líneas adicionales para llenar la página si es necesario -->
-                ${Array(Math.max(40 - notasFormateadas.length, 0)).fill().map(() => `
-                  <tr style="height: 40px;">
-                    <td style="border-left: 1px solid #000; border-right: 1px solid #000; padding: 5px;"></td>
-                    <td style="border-right: 1px solid #000; padding: 5px;"></td>
-                    <td style="border-right: 1px solid #000; padding: 5px;"></td>
-                    <td style="border-right: 1px solid #000; padding: 5px;"></td>
-                  </tr>
-                `).join('')}
               </tbody>
             </table>
           </div>
