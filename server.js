@@ -1380,6 +1380,29 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
     // Insert additional medications
     try {
       await pool.query(`
+        INSERT INTO medicamentos (nombre, descripcion, dosis_estandar, via_administracion)
+        VALUES 
+        ('Paracetamol', 'Analgésico y antipirético', '500mg', 'oral'),
+        ('Ibuprofeno', 'Antiinflamatorio no esteroideo', '400mg', 'oral'),
+        ('Omeprazol', 'Inhibidor de la bomba de protones', '20mg', 'oral'),
+        ('Metformina', 'Antidiabético', '850mg', 'oral'),
+        ('Losartán', 'Antihipertensivo', '50mg', 'oral')
+        ON CONFLICT (nombre) DO NOTHING
+      `);
+    } catch (medicamentosError) {
+      console.warn('Error inserting medications (may already exist):', medicamentosError.message);
+    }
+
+    console.log('Sample data insertion completed successfully');
+    res.json({ message: 'Datos de ejemplo insertados correctamente' });
+
+  } catch (error) {
+    console.error('Error inserting sample data:', error);
+    res.status(500).json({ error: 'Error al insertar datos de ejemplo: ' + error.message });
+  }
+});
+    try {
+      await pool.query(`
         INSERT INTO medicamentos (nombre, descripcion, unidad_medida) VALUES
         ('Lorazepam', 'Ansiolítico benzodiazepina', 'mg'),
         ('Sertralina', 'Antidepresivo ISRS', 'mg'),
