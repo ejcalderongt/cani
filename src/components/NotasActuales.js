@@ -222,42 +222,30 @@ function NotasActuales() {
               text-align: center;
               font-size: 10px;
             }
-            .notes-section td {
-              border: ${formatoImpresion === 'con-lineas' ? '1px solid #000' : 'none'}; /* Conditional border for rows */
-              padding: 5px;
-              vertical-align: top;
-              font-size: 9px;
-              ${formatoImpresion === 'con-lineas' ? '' : 'border-bottom: 1px solid #eee;'} /* Add subtle line for simplified if needed */
-            }
-            /* Specific styling for simplified format */
-            ${formatoImpresion === 'simplificado' ? `
+            ${formatoImpresion === 'con-lineas' ? `
               .notes-section td {
-                border-right: 1px solid #000; /* Keep vertical lines for all columns */
-                border-left: none;
-                border-bottom: none; /* Remove horizontal lines */
-                border-top: none;
+                border: 1px solid #000; /* Full borders for official format */
                 padding: 5px;
                 vertical-align: top;
                 font-size: 9px;
               }
-              .notes-section td:first-child {
-                border-left: none;
+            ` : `
+              .notes-section td {
+                border-right: 1px solid #000; /* Keep vertical lines */
+                border-left: 1px solid #000; /* Keep vertical lines */
+                border-bottom: none; /* Remove horizontal lines */
+                border-top: none; /* Remove horizontal lines */
+                padding: 5px;
+                vertical-align: top;
+                font-size: 9px;
               }
-              .notes-section tr {
-                border-bottom: none;
+              .notes-section tbody tr:first-child td {
+                border-top: 1px solid #000; /* Keep top border for first row */
               }
-              .notes-section table {
-                border: 2px solid #000; /* Keep outer border */
-                border-collapse: collapse;
+              .notes-section tbody tr:last-child td {
+                border-bottom: 1px solid #000; /* Keep bottom border for last row */
               }
-              .notes-section th {
-                border: 1px solid #000; /* Keep header borders */
-              }
-              .notes-section tbody tr td {
-                border-bottom: none !important;
-                border-top: none !important;
-              }
-            ` : ''}
+            `}
             @media print {
               body { margin: 0; }
             }
