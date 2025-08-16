@@ -509,7 +509,7 @@ app.post('/api/cambiar-clave', async (req, res) => {
     const hashedNewPassword = await bcrypt.hash(nuevaClave, 10);
 
     await pool.query(
-      'UPDATE enfermeros SET clave = $1, debe_cambiar_password = false, primer_login = false WHERE codigo = $2',
+      'UPDATE enfermeros SET clave = $1, debe_cambiar_clave = false, primer_login = false WHERE codigo = $2',
       [hashedNewPassword, codigo]
     );
 
@@ -1318,11 +1318,11 @@ app.get('/api/status', async (req, res) => {
     try {
       // Check if user needs to change password
       const result = await pool.query(
-        'SELECT debe_cambiar_password FROM enfermeros WHERE id = $1',
+        'SELECT debe_cambiar_clave FROM enfermeros WHERE id = $1',
         [req.session.enfermero_id]
       );
 
-      const requiereCambio = result.rows.length > 0 && result.rows[0].debe_cambiar_password;
+      const requiereCambio = result.rows.length > 0 && result.rows[0].debe_cambiar_clave;
 
       res.json({
         session: req.session,
