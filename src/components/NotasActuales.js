@@ -312,6 +312,9 @@ function NotasActuales() {
             Documento generado automáticamente el ${fechaImpresion}<br>
             Sistema Hospitalario - Notas de Enfermería
           </div>
+
+          <!-- Bottom line to define page end -->
+          <div style="margin-top: 30px; border-bottom: 3px solid #000; padding-bottom: 10px;"></div>
         </body>
       </html>
     `;
@@ -340,7 +343,7 @@ function NotasActuales() {
 
           <Form>
             <div className="row">
-              <div className="col-md-4">
+              <div className="col-md-3">
                 <Form.Group className="mb-3">
                   <Form.Label>Fecha Inicio</Form.Label>
                   <Form.Control
@@ -350,7 +353,7 @@ function NotasActuales() {
                   />
                 </Form.Group>
               </div>
-              <div className="col-md-4">
+              <div className="col-md-3">
                 <Form.Group className="mb-3">
                   <Form.Label>Fecha Fin</Form.Label>
                   <Form.Control
@@ -360,7 +363,7 @@ function NotasActuales() {
                   />
                 </Form.Group>
               </div>
-              <div className="col-md-4 d-flex align-items-end">
+              <div className="col-md-6 d-flex align-items-end justify-content-start">
                 <Button
                   variant="primary"
                   onClick={buscarNotas}

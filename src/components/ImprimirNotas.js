@@ -534,6 +534,9 @@ function ImprimirNotas() {
               Sistema Hospitalario - Notas de Enfermería con carácter legal
             </div>
           </div>
+
+          <!-- Bottom line to define page end -->
+          <div style="margin-top: 30px; border-bottom: 3px solid #000; padding-bottom: 10px;"></div>
         </body>
       </html>
     `;
@@ -593,34 +596,30 @@ function ImprimirNotas() {
                 />
               </Form.Group>
             </div>
-            <div className="col-md-6 d-flex align-items-end">
+            <div className="col-md-3 d-flex align-items-end">
               <Button
                 variant="primary"
                 onClick={fetchNotasPaciente}
                 disabled={!selectedPaciente || loading}
-                className="me-2"
+                className="mb-3"
               >
                 {loading ? 'Cargando...' : 'Buscar Notas'}
               </Button>
             </div>
-          </div>
-
-          {notas.length > 0 && (
-            <div className="row">
-              <div className="col-12">
-                <div className="text-center">
-                  <Button
-                    variant="success"
-                    onClick={imprimirPDF}
-                    disabled={notas.length === 0}
-                    size="lg"
-                  >
-                    📄 Imprimir PDF
-                  </Button>
-                </div>
-              </div>
+            <div className="col-md-3 d-flex align-items-end justify-content-end">
+              {notas.length > 0 && (
+                <Button
+                  variant="success"
+                  onClick={imprimirPDF}
+                  disabled={notas.length === 0}
+                  size="lg"
+                  className="mb-3"
+                >
+                  📄 Imprimir PDF
+                </Button>
+              )}
             </div>
-          )}
+          </div>
         </Card.Body>
       </Card>
 
