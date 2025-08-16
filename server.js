@@ -1214,11 +1214,32 @@ app.put('/api/pacientes/:id/activo', requireAuth, async (req, res) => {
 // Insert sample data endpoint (admin only)
 app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
   try {
+    console.log('Starting sample data insertion...');
+    
+    // Check if database connection is available
+    if (!process.env.DATABASE_URL) {
+      return res.status(500).json({ 
+        error: 'No hay conexión a la base de datos configurada. Configure PostgreSQL en la pestaña Database.' 
+      });
+    }
+
     // Start transaction
     await pool.query('BEGIN');
 
+    // First, get existing users to use valid enfermero IDs
+    const enfermerosResult = await pool.query('SELECT id, codigo FROM enfermeros WHERE activo = true LIMIT 4');
+    if (enfermerosResult.rows.length < 2) {
+      await pool.query('ROLLBACK');
+      return res.status(500).json({ 
+        error: 'No hay suficientes usuarios activos en el sistema para crear los datos de ejemplo.' 
+      });
+    }
+
+    const enfermeroIds = enfermerosResult.rows.map(e => e.id);
+    console.log('Available enfermero IDs:', enfermeroIds);
+
     // Insert sample patients
-    await pool.query(`
+    const pacienteInsertResult = await pool.query(`
       INSERT INTO pacientes (
         numero_expediente, nombre, apellidos, fecha_nacimiento, documento_identidad,
         nacionalidad, contacto_emergencia_nombre, contacto_emergencia_telefono,
@@ -1228,10 +1249,11 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
         medico_tratante, equipo_tratante, riesgo_suicidio, riesgo_violencia,
         riesgo_fuga, riesgo_caidas
       ) VALUES
-      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27),
-      ($28, $29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54),
-      ($55, $56, $57, $58, $59, $60, $61, $62, $63, $64, $65, $66, $67, $68, $69, $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $80, $81)
+      ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28),
+      ($29, $30, $31, $32, $33, $34, $35, $36, $37, $38, $39, $40, $41, $42, $43, $44, $45, $46, $47, $48, $49, $50, $51, $52, $53, $54, $55, $56),
+      ($57, $58, $59, $60, $61, $62, $63, $64, $65, $66, $67, $68, $69, $70, $71, $72, $73, $74, $75, $76, $77, $78, $79, $80, $81, $82, $83, $84)
       ON CONFLICT (numero_expediente) DO NOTHING
+      RETURNING id, numero_expediente
     `, [
       'EXP001', 'Juan Carlos', 'Pérez González', '1985-03-15', '001-150385-1023N',
       'Nicaragüense', 'María González', '8888-1234', '8777-5678', '8666-9012',
@@ -1255,95 +1277,118 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
       'Dr. Francisco Gómez', 'Equipo Gamma', false, false, false, false
     ]);
 
-    // Get patient IDs for the notes
-    const pacientesResult = await pool.query('SELECT id, numero_expediente FROM pacientes WHERE numero_expediente IN ($1, $2, $3)',
-      ['EXP001', 'EXP002', 'EXP003']);
+    // Get patient IDs - either from insert result or existing patients
+    let pacientes = {};
+    if (pacienteInsertResult.rows.length > 0) {
+      pacienteInsertResult.rows.forEach(p => {
+        pacientes[p.numero_expediente] = p.id;
+      });
+    } else {
+      // Get existing patients if they were already in the database
+      const existingPacientesResult = await pool.query(
+        'SELECT id, numero_expediente FROM pacientes WHERE numero_expediente IN ($1, $2, $3)',
+        ['EXP001', 'EXP002', 'EXP003']
+      );
+      existingPacientesResult.rows.forEach(p => {
+        pacientes[p.numero_expediente] = p.id;
+      });
+    }
 
-    const pacientes = {};
-    pacientesResult.rows.forEach(p => {
-      pacientes[p.numero_expediente] = p.id;
-    });
+    console.log('Patient IDs:', pacientes);
 
-    // Insert sample nursing notes
-    await pool.query(`
-      INSERT INTO notas_enfermeria (
-        fecha, hora, paciente_id, enfermero_id, observaciones,
-        medicamentos_administrados, tratamientos
-      ) VALUES
-      ($1, $2, $3, $4, $5, $6, $7),
-      ($8, $9, $10, $11, $12, $13, $14),
-      ($15, $16, $17, $18, $19, $20, $21),
-      ($22, $23, $24, $25, $26, $27, $28),
-      ($29, $30, $31, $32, $33, $34, $35),
-      ($36, $37, $38, $39, $40, $41, $42)
-      ON CONFLICT DO NOTHING
-    `, [
-      '2025-01-15', '08:00', pacientes['EXP001'], 2,
-      'Paciente despertó tranquilo. Signos vitales estables. Refiere haber dormido bien durante la noche. Se muestra colaborador con el personal. Presenta buen estado de ánimo. Solicita hablar con su familia.',
-      'Lorazepam 2mg vía oral - Administrado a las 06:00 hrs según indicación médica. Omeprazol 20mg vía oral en ayunas.',
-      'Terapia grupal programada para las 10:00 hrs. Ejercicios de relajación y respiración. Control de signos vitales cada 4 horas.',
+    // Only insert notes if we have patients
+    if (Object.keys(pacientes).length > 0) {
+      // Insert sample nursing notes with proper error handling
+      try {
+        await pool.query(`
+          INSERT INTO notas_enfermeria (
+            fecha, hora, paciente_id, enfermero_id, observaciones
+          ) VALUES
+          ($1, $2, $3, $4, $5),
+          ($6, $7, $8, $9, $10),
+          ($11, $12, $13, $14, $15),
+          ($16, $17, $18, $19, $20),
+          ($21, $22, $23, $24, $25),
+          ($26, $27, $28, $29, $30)
+        `, [
+          '2025-01-15', '08:00', pacientes['EXP001'] || 1, enfermeroIds[0],
+          'Paciente despertó tranquilo. Signos vitales estables. Refiere haber dormido bien durante la noche. Se muestra colaborador con el personal. Presenta buen estado de ánimo. Solicita hablar con su familia.',
 
-      '2025-01-15', '14:30', pacientes['EXP001'], 3,
-      'Durante la tarde el paciente participó activamente en la terapia grupal. Mostró buena disposición para compartir sus experiencias. Come adecuadamente. No presenta náuseas ni vómitos. Hidratación oral adecuada.',
-      'Vitamina B1 100mg IM - Aplicada en glúteo derecho. Multivitamínico 1 tableta vía oral después del almuerzo.',
-      'Continúa con plan de desintoxicación. Próxima evaluación médica programada para mañana. Monitoreo estrecho de síntomas de abstinencia.',
+          '2025-01-15', '14:30', pacientes['EXP001'] || 1, enfermeroIds[1] || enfermeroIds[0],
+          'Durante la tarde el paciente participó activamente en la terapia grupal. Mostró buena disposición para compartir sus experiencias. Come adecuadamente. No presenta náuseas ni vómitos. Hidratación oral adecuada.',
 
-      '2025-01-15', '22:00', pacientes['EXP001'], 2,
-      'Turno nocturno tranquilo. Paciente cena completamente. Ve televisión en sala común hasta las 21:00 hrs. Se retira a su habitación sin dificultad. Refiere sentirse ansioso pero controlado.',
-      'Lorazepam 1mg vía oral a las 21:30 hrs para ansiedad nocturna según protocolo.',
-      'Técnicas de relajación aplicadas antes de dormir. Ambiente tranquilo mantenido en habitación. Rondas de supervisión cada 2 horas durante la noche.',
+          '2025-01-15', '22:00', pacientes['EXP001'] || 1, enfermeroIds[0],
+          'Turno nocturno tranquilo. Paciente cena completamente. Ve televisión en sala común hasta las 21:00 hrs. Se retira a su habitación sin dificultad. Refiere sentirse ansioso pero controlado.',
 
-      '2025-01-15', '09:15', pacientes['EXP002'], 3,
-      'Paciente presenta episodio de llanto al despertar. Refiere pesadillas recurrentes. Signos vitales: TA 110/70, FC 88, FR 18, Temp 36.8°C. Acepta desayuno parcialmente. Se muestra retraída al contacto social.',
-      'Sertralina 50mg vía oral después del desayuno. Risperidona 2mg vía oral según indicación psiquiátrica.',
-      'Sesión individual con psicólogo programada. Observación estrecha por riesgo suicida. Retiro de objetos potencialmente peligrosos de la habitación.',
+          '2025-01-15', '09:15', pacientes['EXP002'] || 1, enfermeroIds[1] || enfermeroIds[0],
+          'Paciente presenta episodio de llanto al despertar. Refiere pesadillas recurrentes. Signos vitales: TA 110/70, FC 88, FR 18, Temp 36.8°C. Acepta desayuno parcialmente. Se muestra retraída al contacto social.',
 
-      '2025-01-15', '16:45', pacientes['EXP002'], 2,
-      'Mejoría notable después de sesión terapéutica. Paciente más comunicativa y participativa. Realizó actividades de arte-terapia. Buen apetito durante la merienda. Interactúa positivamente con otras pacientes.',
-      'Lorazepam 0.5mg vía oral por ansiedad residual a las 15:30 hrs.',
-      'Continúa en observación por riesgo suicida nivel medio. Actividades recreativas supervisadas. Llamada telefónica con familiar autorizada por 10 minutos.',
+          '2025-01-15', '16:45', pacientes['EXP002'] || 1, enfermeroIds[0],
+          'Mejoría notable después de sesión terapéutica. Paciente más comunicativa y participativa. Realizó actividades de arte-terapia. Buen apetito durante la merienda. Interactúa positivamente con otras pacientes.',
 
-      '2025-01-16', '08:30', pacientes['EXP003'], 4,
-      'Paciente acude puntual a cita de seguimiento. Refiere adherencia al tratamiento ambulatorio. Examina físico sin hallazgos significativos. Laboratorios pendientes de resultado. Peso estable.',
-      'No medicamentos administrados durante la consulta. Receta renovada para tratamiento domiciliar.',
-      'Educación sobre importancia de abstinencia alcohólica. Próxima cita programada en 2 semanas. Referencia a grupo de apoyo AA.'
-    ]);
+          '2025-01-16', '08:30', pacientes['EXP003'] || 1, enfermeroIds[2] || enfermeroIds[0],
+          'Paciente acude puntual a cita de seguimiento. Refiere adherencia al tratamiento ambulatorio. Examen físico sin hallazgos significativos. Laboratorios pendientes de resultado. Peso estable.'
+        ]);
+      } catch (notasError) {
+        console.warn('Error inserting nursing notes (may already exist):', notasError.message);
+      }
+
+      // Insert sample vital signs
+      try {
+        await pool.query(`
+          INSERT INTO signos_vitales (
+            paciente_id, enfermero_id, presion_sistolica, presion_diastolica,
+            saturacion_oxigeno, frecuencia_cardiaca, temperatura, observaciones
+          ) VALUES
+          ($1, $2, 120, 80, 98.5, 72, 36.5, 'Signos vitales normales, paciente estable'),
+          ($3, $4, 110, 70, 99.0, 88, 36.8, 'Ligera taquicardia, relacionada con ansiedad'),
+          ($5, $6, 140, 90, 97.8, 76, 36.4, 'Hipertensión leve, requiere seguimiento')
+        `, [
+          pacientes['EXP001'] || 1, enfermeroIds[0], 
+          pacientes['EXP002'] || 1, enfermeroIds[1] || enfermeroIds[0],
+          pacientes['EXP003'] || 1, enfermeroIds[2] || enfermeroIds[0]
+        ]);
+      } catch (signosError) {
+        console.warn('Error inserting vital signs (may already exist):', signosError.message);
+      }
+    }
 
     // Insert additional medications
-    await pool.query(`
-      INSERT INTO medicamentos (nombre, descripcion, unidad_medida) VALUES
-      ('Lorazepam', 'Ansiolítico benzodiazepina', 'mg'),
-      ('Sertralina', 'Antidepresivo ISRS', 'mg'),
-      ('Risperidona', 'Antipsicótico atípico', 'mg'),
-      ('Vitamina B1 (Tiamina)', 'Suplemento vitamínico', 'mg'),
-      ('Multivitamínico', 'Complejo vitamínico', 'tableta')
-      ON CONFLICT (nombre) DO NOTHING
-    `);
-
-    // Insert sample vital signs
-    await pool.query(`
-      INSERT INTO signos_vitales (
-        paciente_id, enfermero_id, presion_sistolica, presion_diastolica,
-        saturacion_oxigeno, frecuencia_cardiaca, temperatura, observaciones
-      ) VALUES
-      ($1, $2, 120, 80, 98.5, 72, 36.5, 'Signos vitales normales, paciente estable'),
-      ($3, $4, 110, 70, 99.0, 88, 36.8, 'Ligera taquicardia, relacionada con ansiedad'),
-      ($5, $6, 140, 90, 97.8, 76, 36.4, 'Hipertensión leve, requiere seguimiento')
-    `, [pacientes['EXP001'], 2, pacientes['EXP002'], 3, pacientes['EXP003'], 4]);
+    try {
+      await pool.query(`
+        INSERT INTO medicamentos (nombre, descripcion, unidad_medida) VALUES
+        ('Lorazepam', 'Ansiolítico benzodiazepina', 'mg'),
+        ('Sertralina', 'Antidepresivo ISRS', 'mg'),
+        ('Risperidona', 'Antipsicótico atípico', 'mg'),
+        ('Vitamina B1 (Tiamina)', 'Suplemento vitamínico', 'mg'),
+        ('Multivitamínico', 'Complejo vitamínico', 'tableta')
+        ON CONFLICT (nombre) DO NOTHING
+      `);
+    } catch (medicamentosError) {
+      console.warn('Error inserting medications (may already exist):', medicamentosError.message);
+    }
 
     // Commit transaction
     await pool.query('COMMIT');
 
-    res.json({
-      message: 'Datos de ejemplo insertados correctamente. Se crearon 3 pacientes con sus respectivas notas de enfermería, medicamentos y signos vitales.'
-    });
+    const message = 'Datos de ejemplo insertados correctamente. Se crearon 3 pacientes con sus respectivas notas de enfermería, medicamentos y signos vitales.';
+    console.log('Sample data insertion completed successfully');
+    
+    res.json({ message });
 
-    console.log('Sample data inserted successfully');
   } catch (error) {
     // Rollback transaction on error
-    await pool.query('ROLLBACK');
+    try {
+      await pool.query('ROLLBACK');
+    } catch (rollbackError) {
+      console.error('Error rolling back transaction:', rollbackError);
+    }
+    
     console.error('Error inserting sample data:', error);
-    res.status(500).json({ error: 'Error al insertar los datos de ejemplo' });
+    
+    res.status(500).json({ 
+      error: 'Error al insertar los datos de ejemplo: ' + (error.message || 'Error desconocido') 
+    });
   }
 });
 
