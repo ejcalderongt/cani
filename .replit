@@ -438,6 +438,10 @@ args = "NODE_ENV=production PORT=80 node server.js"
 localPort = 80
 externalPort = 80
 
+[[ports]]
+localPort = 5000
+externalPort = 5000
+
 [deployment]
 deploymentTarget = "cloudrun"
 run = ["sh", "-c", "NODE_ENV=production PORT=80 node server.js"]
