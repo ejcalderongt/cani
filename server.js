@@ -1227,7 +1227,7 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
     await pool.query('BEGIN');
 
     // First, get existing users to use valid enfermero IDs
-    const enfermerosResult = await pool.query('SELECT id, codigo FROM enfermeros WHERE activo = true LIMIT 4');
+    const enfermerosResult = await pool.query('SELECT id, codigo FROM enfermeros WHERE activo = true ORDER BY id LIMIT 4');
     if (enfermerosResult.rows.length < 2) {
       await pool.query('ROLLBACK');
       return res.status(500).json({ 
@@ -1237,6 +1237,11 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
 
     const enfermeroIds = enfermerosResult.rows.map(e => e.id);
     console.log('Available enfermero IDs:', enfermeroIds);
+
+    // Ensure we have at least 3 enfermero IDs for the sample data
+    const enf1 = enfermeroIds[0];
+    const enf2 = enfermeroIds[1] || enfermeroIds[0];
+    const enf3 = enfermeroIds[2] || enfermeroIds[0];
 
     // Insert sample patients
     const pacienteInsertResult = await pool.query(`
@@ -1283,25 +1288,40 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
       pacienteInsertResult.rows.forEach(p => {
         pacientes[p.numero_expediente] = p.id;
       });
-    } else {
-      // Get existing patients if they were already in the database
-      const existingPacientesResult = await pool.query(
-        'SELECT id, numero_expediente FROM pacientes WHERE numero_expediente IN ($1, $2, $3)',
-        ['EXP001', 'EXP002', 'EXP003']
-      );
-      existingPacientesResult.rows.forEach(p => {
-        pacientes[p.numero_expediente] = p.id;
-      });
     }
+    
+    // Always check for existing patients to ensure we have all IDs
+    const existingPacientesResult = await pool.query(
+      'SELECT id, numero_expediente FROM pacientes WHERE numero_expediente IN ($1, $2, $3)',
+      ['EXP001', 'EXP002', 'EXP003']
+    );
+    existingPacientesResult.rows.forEach(p => {
+      pacientes[p.numero_expediente] = p.id;
+    });
 
     console.log('Patient IDs:', pacientes);
 
-    // Only insert notes if we have patients
-    if (Object.keys(pacientes).length > 0) {
-      // Ensure we have valid IDs
-      const validPacienteId1 = pacientes['EXP001'] || Object.values(pacientes)[0] || 1;
-      const validPacienteId2 = pacientes['EXP002'] || Object.values(pacientes)[1] || validPacienteId1;
-      const validPacienteId3 = pacientes['EXP003'] || Object.values(pacientes)[2] || validPacienteId1;
+    // Validate we have patients before proceeding
+    if (Object.keys(pacientes).length === 0) {
+      await pool.query('ROLLBACK');
+      return res.status(500).json({ 
+        error: 'No se pudieron crear o encontrar los pacientes necesarios para los datos de ejemplo.' 
+      });
+    }
+
+    // Get valid patient IDs with better fallback logic
+    const patientIds = Object.values(pacientes);
+    const validPacienteId1 = pacientes['EXP001'] || patientIds[0];
+    const validPacienteId2 = pacientes['EXP002'] || patientIds[1] || validPacienteId1;
+    const validPacienteId3 = pacientes['EXP003'] || patientIds[2] || validPacienteId1;
+
+    // Validate all IDs are valid numbers
+    if (!validPacienteId1 || !validPacienteId2 || !validPacienteId3) {
+      await pool.query('ROLLBACK');
+      return res.status(500).json({ 
+        error: 'Error: No se pudieron obtener IDs válidos de pacientes.' 
+      });
+    }
 
       // Insert sample nursing notes with proper error handling
       try {
@@ -1316,22 +1336,22 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
           ($21, $22, $23, $24, $25),
           ($26, $27, $28, $29, $30)
         `, [
-          '2025-01-15', '08:00', validPacienteId1, enfermeroIds[0],
+          '2025-01-15', '08:00', validPacienteId1, enf1,
           'Paciente despertó tranquilo. Signos vitales estables. Refiere haber dormido bien durante la noche. Se muestra colaborador con el personal. Presenta buen estado de ánimo. Solicita hablar con su familia.',
 
-          '2025-01-15', '14:30', validPacienteId1, enfermeroIds[1] || enfermeroIds[0],
+          '2025-01-15', '14:30', validPacienteId1, enf2,
           'Durante la tarde el paciente participó activamente en la terapia grupal. Mostró buena disposición para compartir sus experiencias. Come adecuadamente. No presenta náuseas ni vómitos. Hidratación oral adecuada.',
 
-          '2025-01-15', '22:00', validPacienteId1, enfermeroIds[0],
+          '2025-01-15', '22:00', validPacienteId1, enf1,
           'Turno nocturno tranquilo. Paciente cena completamente. Ve televisión en sala común hasta las 21:00 hrs. Se retira a su habitación sin dificultad. Refiere sentirse ansioso pero controlado.',
 
-          '2025-01-15', '09:15', validPacienteId2, enfermeroIds[1] || enfermeroIds[0],
+          '2025-01-15', '09:15', validPacienteId2, enf2,
           'Paciente presenta episodio de llanto al despertar. Refiere pesadillas recurrentes. Signos vitales: TA 110/70, FC 88, FR 18, Temp 36.8°C. Acepta desayuno parcialmente. Se muestra retraída al contacto social.',
 
-          '2025-01-15', '16:45', validPacienteId2, enfermeroIds[0],
+          '2025-01-15', '16:45', validPacienteId2, enf1,
           'Mejoría notable después de sesión terapéutica. Paciente más comunicativa y participativa. Realizó actividades de arte-terapia. Buen apetito durante la merienda. Interactúa positivamente con otras pacientes.',
 
-          '2025-01-16', '08:30', validPacienteId3, enfermeroIds[2] || enfermeroIds[0],
+          '2025-01-16', '08:30', validPacienteId3, enf3,
           'Paciente acude puntual a cita de seguimiento. Refiere adherencia al tratamiento ambulatorio. Examen físico sin hallazgos significativos. Laboratorios pendientes de resultado. Peso estable.'
         ]);
       } catch (notasError) {
@@ -1349,9 +1369,9 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
           ($3, $4, 110, 70, 99.0, 88, 36.8, 'Ligera taquicardia, relacionada con ansiedad'),
           ($5, $6, 140, 90, 97.8, 76, 36.4, 'Hipertensión leve, requiere seguimiento')
         `, [
-          validPacienteId1, enfermeroIds[0], 
-          validPacienteId2, enfermeroIds[1] || enfermeroIds[0],
-          validPacienteId3, enfermeroIds[2] || enfermeroIds[0]
+          validPacienteId1, enf1, 
+          validPacienteId2, enf2,
+          validPacienteId3, enf3
         ]);
       } catch (signosError) {
         console.warn('Error inserting vital signs (may already exist):', signosError.message);
