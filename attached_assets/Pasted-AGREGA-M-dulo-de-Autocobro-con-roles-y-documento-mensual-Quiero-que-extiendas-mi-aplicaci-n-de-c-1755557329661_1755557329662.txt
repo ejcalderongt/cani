@@ -1,0 +1,98 @@
+AGREGA: “Módulo de Autocobro con roles y documento mensual”
+
+Quiero que extiendas mi aplicación de control de pacientes con un módulo de Autocobro. 
+Debe detectar el stack existente y trabajar con él (si es Python, usa FastAPI + SQLAlchemy; si es Node, usa Express + Prisma; si es otra cosa, adapta equivalente). Requisitos funcionales y técnicos:
+
+Objetivo
+Calcular y mostrar el cobro mensual estimado de la plataforma.
+Generar un documento descargable (PDF y CSV) con el detalle de ese cobro cada mes.
+Parámetros de facturación configurables solo por admin, no visibles para el resto.
+Control de acceso mediante roles/permisos, con un “gestor de pagos” asignable a usuarios específicos.
+Modelo de precios (valores por defecto, editables por admin)
+Cargo fijo de servidor (mensual): 20 USD (server_monthly_fee).
+Mantenimiento anual: 150 USD (annual_maintenance_fee).
+Costo por paciente activo (mensual): 10 USD (per_patient_fee).
+Todos estos valores deben ser configurables por el usuario admin dentro del sistema y ocultos para cualquier otro usuario. Proveer también currency (por defecto USD) y un toggle prorate_annual_maintenance (true/false) para decidir si el mantenimiento anual se prorratea mensualmente.
+Definiciones importantes
+Paciente activo del mes: por defecto, todo paciente con estado “Activo” durante el mes de cálculo. Crea un parámetro active_patient_rule que permita cambiar la regla en el futuro (por ejemplo: “paciente con al menos 1 consulta en el mes”). Implementa la primera versión como “estado Activo”.
+Cálculo mensual:
+total = server_monthly_fee + (active_patients_count * per_patient_fee) + (prorate_annual_maintenance ? annual_maintenance_fee/12 : 0)
+Incluye en el documento: conteo de pacientes activos, cada componente y el total.
+Seguridad y permisos (RBAC)
+Roles base: admin, clinician (médico), staff.
+Nuevo permiso granular: billing:view_manage.
+Agrega un checkbox/flag en la administración de usuarios: “Puede ver/gestionar pagos” que asigne el permiso billing:view_manage a ese usuario concreto (rol o permiso por usuario).
+Solo usuarios con billing:view_manage podrán:
+Ver el dashboard de Autocobro.
+Generar/descargar documentos (PDF/CSV).
+Solo admin podrá:
+Leer/editar parámetros de facturación.
+Ver el historial de cambios de configuración.
+Persistencia (tablas / entidades sugeridas)
+Crea migraciones y seed con valores por defecto:
+billing_settings
+id
+server_monthly_fee (decimal, default 20.00)
+annual_maintenance_fee (decimal, default 150.00)
+per_patient_fee (decimal, default 10.00)
+currency (string, default "USD")
+prorate_annual_maintenance (bool, default true)
+active_patient_rule (string, default "status_active")
+updated_by_user_id, updated_at
+Reglas: Solo admin puede leer/escribir. Para no-admin, el endpoint debe ocultar por completo estos campos (no exponerlos en ninguna respuesta).
+users
+Agrega campo/relación para permisos por usuario o tabla relacional user_permissions con permission_key (billing:view_manage).
+invoices (para documento mensual estimado/emitido)
+id, period_year, period_month
+server_monthly_fee, annual_maintenance_component, per_patient_fee, active_patients_count, subtotal_components_json
+currency, total_amount
+status (p.ej., draft, issued, paid) — inicial draft
+generated_by_user_id, generated_at
+Permisos: crear/ver/descargar solo con billing:view_manage. (Admin también, por supuesto).
+Nota: Aunque el documento sea “estimado”, guarda un snapshot de valores usados para que el histórico no cambie si luego el admin actualiza precios.
+API / Endpoints
+GET /billing/summary?year=YYYY&month=MM → retorna el cálculo del mes (solo billing:view_manage). No incluye los valores de configuración crudos; solo resultados y desglose.
+POST /billing/generate?year=YYYY&month=MM → crea un registro invoices con snapshot y genera archivos PDF y CSV (adjunta rutas o blobs). (Permiso billing:view_manage).
+GET /billing/invoices/:id → metadatos del documento (permiso billing:view_manage o admin).
+GET /billing/invoices/:id/download.pdf y /download.csv → descarga (permiso billing:view_manage).
+GET /admin/billing-settings / PUT /admin/billing-settings → leer/actualizar parámetros (solo admin). Para cualquier usuario no admin, este recurso no existe (responder 404).
+UI
+Panel Admin → Facturación (configuración): formulario con los campos arriba, audit trail (última modificación y usuario).
+Panel “Autocobro” (visible solo con billing:view_manage):
+Selector de periodo (mes/año).
+Cards con desglose: pacientes activos, fee servidor, fee por paciente, mantenimiento (prorrateado o no), total.
+Botón “Generar documento” → crea invoice (PDF/CSV) y muestra enlaces de descarga.
+Tabla de “Documentos generados” con estado e historial.
+Generación de documentos
+PDF: portada con nombre de la clínica/tenant, periodo (p.ej., “Agosto 2025”), desglose de conceptos y total; pie con fecha/hora de generación y usuario.
+CSV: columnas: period_year,period_month,active_patients_count,server_monthly_fee,per_patient_fee,annual_maintenance_component,total_amount,currency.
+Guarda los archivos en almacenamiento de la app (o bucket si existe). Expón endpoints de descarga autenticados.
+Lógica de pacientes activos
+Implementa una función count_active_patients(year, month):
+Mínimo viable: contar en patients los que tengan status = 'Active' en ese periodo.
+Estructura el código para poder cambiar la regla luego a “tuvo al menos 1 consulta en el mes”.
+
+Auditoría y pruebas
+
+Audit log en cambios de billing_settings (quién, qué, cuándo).
+Tests unitarios/integ. para:
+Permisos (no filtrar por frontend; validar en backend).
+Cálculo del total con/ sin prorrateo.
+Generación de invoice y persistencia del snapshot.
+Seed / Defaults / ENV
+Si no existen settings, crear registro billing_settings con defaults: 20/150/10, USD, prorate_annual_maintenance=true.
+Permitir override inicial por ENV:
+DEFAULT_SERVER_MONTHLY_FEE, DEFAULT_ANNUAL_MAINTENANCE_FEE, DEFAULT_PER_PATIENT_FEE, DEFAULT_CURRENCY, DEFAULT_PRORATE_ANNUAL_MAINTENANCE.
+No exponer estos valores por API a no-admin.
+
+Calidad y DX
+Código limpio, validación de inputs, manejo de errores consistente.
+No revelar campos sensibles en respuestas ni logs.
+Criterios de aceptación
+Un usuario sin billing:view_manage no puede acceder a /billing/* ni ver montos.
+Un usuario con billing:view_manage ve el cálculo del mes y puede generar/descargar PDF/CSV.
+Solo admin puede leer/editar billing_settings y ver historial de cambios.
+El cálculo usa los parámetros vigentes del snapshot guardado en cada invoice.
+
+El mantenimiento anual se incluye o no en el mes según prorate_annual_maintenance.
+Los valores por defecto son 20/150/10 y pueden cambiarse por admin.
