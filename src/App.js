@@ -34,38 +34,59 @@ const API_BASE_URL = process.env.NODE_ENV === 'production'
   : window.location.origin;
 
 function App() {
-  const [enfermero, setEnfermero] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [user, setUser] = useState(null);
   const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [requirePasswordChange, setRequirePasswordChange] = useState(false);
 
   useEffect(() => {
-    const checkAuthStatus = async () => {
-      try {
-        const response = await axios.get('/api/status');
-        if (response.data.authenticated && response.data.session) {
-          setEnfermero(response.data.session);
-          setIsAuthenticated(true);
-        }
-      } catch (error) {
-        console.log('Not authenticated');
-      } finally {
-        setLoading(false);
-      }
-    };
-
     checkAuthStatus();
   }, []);
 
-  const handleLogin = (enfermeroData) => {
-    setEnfermero(enfermeroData);
+  const checkAuthStatus = async () => {
+    try {
+      setLoading(true);
+      const response = await axios.get('/api/status', {
+        withCredentials: true,
+        timeout: 10000
+      });
+
+      if (response.data.authenticated) {
+        const userData = {
+          ...response.data.usuario,
+          // Ensure admin always has billing access
+          can_manage_billing: response.data.usuario.rol === 'admin' ? true : response.data.usuario.can_manage_billing
+        };
+        setUser(userData);
+        setIsAuthenticated(true);
+        setRequirePasswordChange(response.data.requiere_cambio_clave || false);
+      } else {
+        setUser(null);
+        setIsAuthenticated(false);
+        setRequirePasswordChange(false);
+      }
+    } catch (error) {
+      console.error('Error checking auth status:', error);
+      setUser(null);
+      setIsAuthenticated(false);
+      setRequirePasswordChange(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleLogin = (userData) => {
+    setUser(userData);
     setIsAuthenticated(true);
+    setRequirePasswordChange(userData.requiere_cambio_clave || false);
   };
 
   const handleLogout = async () => {
     try {
       await axios.post('/api/logout');
-      setEnfermero(null);
+      setUser(null);
       setIsAuthenticated(false);
+      setRequirePasswordChange(false);
     } catch (error) {
       console.error('Error al cerrar sesión:', error);
     }
@@ -78,6 +99,17 @@ function App() {
           <span className="visually-hidden">Cargando...</span>
         </div>
       </div>
+    );
+  }
+
+  if (requirePasswordChange) {
+    return (
+      <Router>
+        <Routes>
+          <Route path="/cambiar-clave" element={<CambiarClave onPasswordChangeSuccess={() => setIsAuthenticated(true)} />} />
+          <Route path="*" element={<Navigate to="/cambiar-clave" />} />
+        </Routes>
+      </Router>
     );
   }
 
@@ -166,34 +198,34 @@ function App() {
           <Route
             path="/admin/usuarios"
             element={
-              enfermero?.codigo === 'admin' ? <MantenimientoUsuarios /> : <Navigate to="/" />
-            }
-          />
-
-          <Route
-            path="/admin/hospital"
-            element={
-              enfermero?.codigo === 'admin' ? <ConfiguracionHospital /> : <Navigate to="/" />
+              user?.rol === 'admin' ? <MantenimientoUsuarios /> : <Navigate to="/" />
             }
           />
 
           <Route
             path="/admin/sistema"
             element={
-              enfermero?.codigo === 'admin' ? <ConfiguracionSistema /> : <Navigate to="/" />
+              user?.rol === 'admin' ? <ConfiguracionSistema /> : <Navigate to="/" />
+            }
+          />
+
+          <Route
+            path="/admin/hospital"
+            element={
+              user?.rol === 'admin' ? <ConfiguracionHospital /> : <Navigate to="/" />
             }
           />
 
           <Route
             path="/configuracion-facturacion"
             element={
-              enfermero?.codigo === 'admin' ? <ConfiguracionFacturacion /> : <Navigate to="/" />
+              user?.rol === 'admin' ? <ConfiguracionFacturacion /> : <Navigate to="/" />
             }
           />
           <Route
             path="/autocobro"
             element={
-              enfermero?.codigo === 'admin' ? <Autocobro /> : <Navigate to="/" />
+              (user?.rol === 'admin' || user?.can_manage_billing) ? <Autocobro /> : <Navigate to="/" />
             }
           />
 

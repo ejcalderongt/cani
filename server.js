@@ -361,15 +361,80 @@ async function initDatabase() {
       // Columns might already exist
     }
 
+    // Create billing settings table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS billing_settings (
+        id SERIAL PRIMARY KEY,
+        server_monthly_fee DECIMAL(10,2) DEFAULT 20.00,
+        annual_maintenance_fee DECIMAL(10,2) DEFAULT 150.00,
+        per_patient_fee DECIMAL(10,2) DEFAULT 10.00,
+        currency VARCHAR(3) DEFAULT 'USD',
+        prorate_annual_maintenance BOOLEAN DEFAULT true,
+        active_patient_rule VARCHAR(50) DEFAULT 'status_active',
+        updated_by_user_id INTEGER REFERENCES enfermeros(id),
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Create invoices table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS invoices (
+        id SERIAL PRIMARY KEY,
+        period_year INTEGER NOT NULL,
+        period_month INTEGER NOT NULL,
+        server_monthly_fee DECIMAL(10,2) NOT NULL,
+        annual_maintenance_component DECIMAL(10,2) NOT NULL,
+        per_patient_fee DECIMAL(10,2) NOT NULL,
+        active_patients_count INTEGER NOT NULL,
+        subtotal_components_json TEXT,
+        currency VARCHAR(3) NOT NULL,
+        total_amount DECIMAL(10,2) NOT NULL,
+        status VARCHAR(20) DEFAULT 'draft',
+        generated_by_user_id INTEGER REFERENCES enfermeros(id),
+        generated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        UNIQUE(period_year, period_month)
+      )
+    `);
+
+    // Create billing_audit table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS billing_audit (
+        id SERIAL PRIMARY KEY,
+        changed_by_user_id INTEGER REFERENCES enfermeros(id),
+        changed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        field_name VARCHAR(50) NOT NULL,
+        old_value TEXT,
+        new_value TEXT,
+        action VARCHAR(20) NOT NULL
+      )
+    `);
+
+    // Add billing and role columns to enfermeros if they don't exist
+    try {
+      await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS rol VARCHAR(20) DEFAULT 'staff'`);
+      await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS can_manage_billing BOOLEAN DEFAULT false`);
+    } catch (error) {
+      // Columns might already exist
+    }
+
+    // Insert default billing settings if not exists
+    const billingSettingsExists = await pool.query('SELECT id FROM billing_settings LIMIT 1');
+    if (billingSettingsExists.rows.length === 0) {
+      await pool.query(`
+        INSERT INTO billing_settings (server_monthly_fee, annual_maintenance_fee, per_patient_fee, currency, prorate_annual_maintenance, active_patient_rule)
+        VALUES (20.00, 150.00, 10.00, 'USD', true, 'status_active')
+      `);
+    }
+
     // Insert default users if they don't exist
     const existingUsers = await pool.query('SELECT codigo FROM enfermeros WHERE codigo IN ($1, $2, $3, $4)', ['admin', 'erick', 'cintia', 'ENF001']);
     const existingCodes = existingUsers.rows.map(row => row.codigo);
 
     const defaultUsers = [
-      {codigo: 'admin', clave: 'admin123', nombre: 'Admin', apellidos: 'Sistema', turno: 'todos', debe_cambiar_clave: false, primer_login: false },
-      {codigo: 'erick', clave: 'abc123', nombre: 'Erick', apellidos: 'Usuario', turno: 'mañana', debe_cambiar_clave: true, primer_login: true },
-      {codigo: 'cintia', clave: 'abc123', nombre: 'Cintia', apellidos: 'Usuario', turno: 'tarde', debe_cambiar_clave: true, primer_login: true },
-      {codigo: 'ENF001', clave: 'abc123', nombre: 'Enfermero', apellidos: 'De Prueba', turno: 'mañana', debe_cambiar_clave: true, primer_login: true }
+      {codigo: 'admin', clave: 'admin123', nombre: 'Admin', apellidos: 'Sistema', turno: 'todos', debe_cambiar_clave: false, primer_login: false, rol: 'admin', can_manage_billing: true },
+      {codigo: 'erick', clave: 'abc123', nombre: 'Erick', apellidos: 'Usuario', turno: 'mañana', debe_cambiar_clave: true, primer_login: true, rol: 'enfermero', can_manage_billing: false },
+      {codigo: 'cintia', clave: 'abc123', nombre: 'Cintia', apellidos: 'Usuario', turno: 'tarde', debe_cambiar_clave: true, primer_login: true, rol: 'enfermero', can_manage_billing: false },
+      {codigo: 'ENF001', clave: 'abc123', nombre: 'Enfermero', apellidos: 'De Prueba', turno: 'mañana', debe_cambiar_clave: true, primer_login: true, rol: 'enfermero', can_manage_billing: false }
     ];
 
     for (const user of defaultUsers) {
@@ -377,18 +442,18 @@ async function initDatabase() {
         // Hash the default password before inserting
         const hashedPassword = await bcrypt.hash(user.clave, 10);
         await pool.query(`
-          INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno, debe_cambiar_clave, primer_login)
-          VALUES ($1, $2, $3, $4, $5, $6, $7)
-        `, [user.codigo, hashedPassword, user.nombre, user.apellidos, user.turno, user.debe_cambiar_clave, user.primer_login]);
+          INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno, debe_cambiar_clave, primer_login, rol, can_manage_billing)
+          VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+        `, [user.codigo, hashedPassword, user.nombre, user.apellidos, user.turno, user.debe_cambiar_clave, user.primer_login, user.rol, user.can_manage_billing]);
         console.log(`Created user: ${user.codigo}`);
       }
     }
 
-    // Update admin password to ensure it works
+    // Update admin user to ensure proper configuration
     const hashedAdminPassword = await bcrypt.hash('admin123', 10);
     await pool.query(`
       UPDATE enfermeros
-      SET clave = $1, debe_cambiar_clave = false, primer_login = false
+      SET clave = $1, debe_cambiar_clave = false, primer_login = false, rol = 'admin', can_manage_billing = true
       WHERE codigo = 'admin'
     `, [hashedAdminPassword]);
 
@@ -396,7 +461,7 @@ async function initDatabase() {
     const hashedDefaultPassword = await bcrypt.hash('abc123', 10);
     await pool.query(`
       UPDATE enfermeros
-      SET clave = $1, debe_cambiar_clave = true, primer_login = true
+      SET clave = $1, debe_cambiar_clave = true, primer_login = true, rol = COALESCE(rol, 'enfermero'), can_manage_billing = COALESCE(can_manage_billing, false)
       WHERE codigo != 'admin'
     `, [hashedDefaultPassword]);
 
@@ -818,10 +883,303 @@ app.post('/api/pacientes/:paciente_id/medicamentos', requireAuth, async (req, re
   }
 });
 
+// Billing permission middleware
+const requireBillingAccess = async (req, res, next) => {
+  if (!req.session.enfermero_id) {
+    return res.status(401).json({ error: 'No autenticado' });
+  }
+
+  try {
+    const result = await pool.query('SELECT codigo, rol, can_manage_billing FROM enfermeros WHERE id = $1', [req.session.enfermero_id]);
+    if (result.rows.length === 0) {
+      return res.status(403).json({ error: 'Usuario no encontrado' });
+    }
+
+    const user = result.rows[0];
+    if (user.rol === 'admin' || user.can_manage_billing) {
+      next();
+    } else {
+      return res.status(403).json({ error: 'Acceso denegado. Requiere permisos de facturación.' });
+    }
+  } catch (error) {
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+};
+
+// Billing settings endpoints (admin only)
+app.get('/api/admin/billing-settings', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM billing_settings ORDER BY id LIMIT 1');
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Configuración de facturación no encontrada' });
+    }
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error fetching billing settings:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.put('/api/admin/billing-settings', requireAdmin, async (req, res) => {
+  try {
+    const { server_monthly_fee, annual_maintenance_fee, per_patient_fee, currency, prorate_annual_maintenance, active_patient_rule } = req.body;
+
+    // Get current settings for audit
+    const currentSettings = await pool.query('SELECT * FROM billing_settings ORDER BY id LIMIT 1');
+    const current = currentSettings.rows[0] || {};
+
+    // Update settings
+    const result = await pool.query(`
+      UPDATE billing_settings 
+      SET server_monthly_fee = $1, annual_maintenance_fee = $2, per_patient_fee = $3, 
+          currency = $4, prorate_annual_maintenance = $5, active_patient_rule = $6,
+          updated_by_user_id = $7, updated_at = CURRENT_TIMESTAMP
+      RETURNING *
+    `, [server_monthly_fee, annual_maintenance_fee, per_patient_fee, currency, prorate_annual_maintenance, active_patient_rule, req.session.enfermero_id]);
+
+    // Create audit entries
+    const auditEntries = [
+      { field: 'server_monthly_fee', old: current.server_monthly_fee, new: server_monthly_fee },
+      { field: 'annual_maintenance_fee', old: current.annual_maintenance_fee, new: annual_maintenance_fee },
+      { field: 'per_patient_fee', old: current.per_patient_fee, new: per_patient_fee },
+      { field: 'currency', old: current.currency, new: currency },
+      { field: 'prorate_annual_maintenance', old: current.prorate_annual_maintenance, new: prorate_annual_maintenance },
+      { field: 'active_patient_rule', old: current.active_patient_rule, new: active_patient_rule }
+    ];
+
+    for (const entry of auditEntries) {
+      if (entry.old !== entry.new) {
+        await pool.query(`
+          INSERT INTO billing_audit (changed_by_user_id, field_name, old_value, new_value, action)
+          VALUES ($1, $2, $3, $4, 'UPDATE')
+        `, [req.session.enfermero_id, entry.field, String(entry.old), String(entry.new)]);
+      }
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating billing settings:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.get('/api/admin/billing-settings/audit', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT ba.*, e.nombre, e.apellidos 
+      FROM billing_audit ba
+      JOIN enfermeros e ON ba.changed_by_user_id = e.id
+      ORDER BY ba.changed_at DESC
+      LIMIT 50
+    `);
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching audit log:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Billing summary endpoint (requires billing access)
+app.get('/api/billing/summary', requireBillingAccess, async (req, res) => {
+  try {
+    const { year, month } = req.query;
+
+    if (!year || !month) {
+      return res.status(400).json({ error: 'Año y mes son requeridos' });
+    }
+
+    // Get billing settings
+    const settingsResult = await pool.query('SELECT * FROM billing_settings ORDER BY id LIMIT 1');
+    if (settingsResult.rows.length === 0) {
+      return res.status(500).json({ error: 'Configuración de facturación no encontrada' });
+    }
+
+    const settings = settingsResult.rows[0];
+
+    // Count active patients for the period
+    let activePatients = 0;
+    if (settings.active_patient_rule === 'status_active') {
+      const activeResult = await pool.query(`
+        SELECT COUNT(*) as count 
+        FROM pacientes 
+        WHERE activo = true 
+        AND (fecha_ingreso IS NULL OR DATE_PART('year', fecha_ingreso) <= $1)
+        AND (fecha_salida IS NULL OR (DATE_PART('year', fecha_salida) > $1 OR 
+             (DATE_PART('year', fecha_salida) = $1 AND DATE_PART('month', fecha_salida) >= $2)))
+      `, [year, month]);
+      activePatients = parseInt(activeResult.rows[0].count);
+    }
+
+    // Calculate costs
+    const serverMonthlyFee = parseFloat(settings.server_monthly_fee);
+    const perPatientFee = parseFloat(settings.per_patient_fee);
+    const annualMaintenanceFee = parseFloat(settings.annual_maintenance_fee);
+    const prorateAnnualMaintenance = settings.prorate_annual_maintenance;
+
+    const patientsFeeTotalFee = activePatients * perPatientFee;
+    const annualMaintenanceComponent = prorateAnnualMaintenance ? annualMaintenanceFee / 12 : 0;
+    
+    const total = serverMonthlyFee + patientsFeeTotalFee + annualMaintenanceComponent;
+
+    res.json({
+      period: { year: parseInt(year), month: parseInt(month) },
+      activePatients,
+      components: {
+        serverMonthlyFee,
+        perPatientFee,
+        patientsFeeTotalFee,
+        annualMaintenanceComponent,
+        prorateAnnualMaintenance
+      },
+      total,
+      currency: settings.currency
+    });
+
+  } catch (error) {
+    console.error('Error calculating billing summary:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Generate invoice endpoint
+app.post('/api/billing/generate', requireBillingAccess, async (req, res) => {
+  try {
+    const { year, month } = req.query;
+
+    if (!year || !month) {
+      return res.status(400).json({ error: 'Año y mes son requeridos' });
+    }
+
+    // Check if invoice already exists
+    const existingInvoice = await pool.query(
+      'SELECT id FROM invoices WHERE period_year = $1 AND period_month = $2',
+      [year, month]
+    );
+
+    if (existingInvoice.rows.length > 0) {
+      return res.status(409).json({ error: 'Ya existe un documento para este período' });
+    }
+
+    // Get current billing summary
+    const summaryResponse = await axios.get(`/api/billing/summary?year=${year}&month=${month}`, {
+      headers: { cookie: req.headers.cookie }
+    });
+    const summary = summaryResponse.data;
+
+    // Create invoice record
+    const result = await pool.query(`
+      INSERT INTO invoices (
+        period_year, period_month, server_monthly_fee, annual_maintenance_component,
+        per_patient_fee, active_patients_count, subtotal_components_json,
+        currency, total_amount, generated_by_user_id
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING *
+    `, [
+      year, month, summary.components.serverMonthlyFee, summary.components.annualMaintenanceComponent,
+      summary.components.perPatientFee, summary.activePatients, JSON.stringify(summary.components),
+      summary.currency, summary.total, req.session.enfermero_id
+    ]);
+
+    res.json({
+      message: 'Documento generado correctamente',
+      invoice: result.rows[0]
+    });
+
+  } catch (error) {
+    console.error('Error generating invoice:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Get invoices endpoint
+app.get('/api/billing/invoices', requireBillingAccess, async (req, res) => {
+  try {
+    const result = await pool.query(`
+      SELECT i.*, e.nombre as generated_by_name, e.apellidos as generated_by_apellidos
+      FROM invoices i
+      JOIN enfermeros e ON i.generated_by_user_id = e.id
+      ORDER BY i.period_year DESC, i.period_month DESC
+    `);
+
+    const invoices = result.rows.map(invoice => ({
+      ...invoice,
+      generated_by_name: `${invoice.generated_by_name} ${invoice.generated_by_apellidos}`
+    }));
+
+    res.json(invoices);
+  } catch (error) {
+    console.error('Error fetching invoices:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Download invoice endpoints
+app.get('/api/billing/invoices/:id/download.pdf', requireBillingAccess, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('SELECT * FROM invoices WHERE id = $1', [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Documento no encontrado' });
+    }
+
+    const invoice = result.rows[0];
+    
+    // Generate simple PDF content (you could use a library like PDFKit for better formatting)
+    const pdfContent = `
+FACTURACIÓN MENSUAL
+Período: ${invoice.period_month}/${invoice.period_year}
+Fecha de generación: ${new Date(invoice.generated_at).toLocaleDateString()}
+
+DESGLOSE:
+- Cargo fijo del servidor: ${invoice.currency} ${invoice.server_monthly_fee}
+- Pacientes activos (${invoice.active_patients_count}): ${invoice.currency} ${(invoice.active_patients_count * invoice.per_patient_fee).toFixed(2)}
+- Mantenimiento anual: ${invoice.currency} ${invoice.annual_maintenance_component}
+
+TOTAL: ${invoice.currency} ${invoice.total_amount}
+`;
+
+    res.setHeader('Content-Type', 'application/pdf');
+    res.setHeader('Content-Disposition', `attachment; filename=facturacion_${invoice.period_year}_${invoice.period_month.toString().padStart(2, '0')}.pdf`);
+    res.send(Buffer.from(pdfContent));
+
+  } catch (error) {
+    console.error('Error generating PDF:', error);
+    res.status(500).json({ error: 'Error generando PDF' });
+  }
+});
+
+app.get('/api/billing/invoices/:id/download.csv', requireBillingAccess, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const result = await pool.query('SELECT * FROM invoices WHERE id = $1', [id]);
+    
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Documento no encontrado' });
+    }
+
+    const invoice = result.rows[0];
+    
+    const csvContent = `Concepto,Cantidad,Precio Unitario,Total,Moneda
+Cargo fijo del servidor,1,${invoice.server_monthly_fee},${invoice.server_monthly_fee},${invoice.currency}
+Pacientes activos,${invoice.active_patients_count},${invoice.per_patient_fee},${(invoice.active_patients_count * invoice.per_patient_fee).toFixed(2)},${invoice.currency}
+Mantenimiento anual,1,${invoice.annual_maintenance_component},${invoice.annual_maintenance_component},${invoice.currency}
+TOTAL,,,${invoice.total_amount},${invoice.currency}`;
+
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', `attachment; filename=facturacion_${invoice.period_year}_${invoice.period_month.toString().padStart(2, '0')}.csv`);
+    res.send(csvContent);
+
+  } catch (error) {
+    console.error('Error generating CSV:', error);
+    res.status(500).json({ error: 'Error generando CSV' });
+  }
+});
+
 // User management routes (admin only)
 app.get('/api/admin/usuarios', requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, codigo, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing FROM enfermeros ORDER BY nombre');
+    const result = await pool.query('SELECT id, codigo, nombre, apellidos, turno, activo, debe_cambiar_clave, rol, can_manage_billing FROM enfermeros ORDER BY nombre');
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching usuarios:', error);
@@ -1555,7 +1913,7 @@ app.get('/api/status', async (req, res) => {
     try {
       // Check if user needs to change password
       const result = await pool.query(
-        'SELECT debe_cambiar_clave, codigo, nombre, can_manage_billing FROM enfermeros WHERE id = $1',
+        'SELECT debe_cambiar_clave, codigo, nombre, rol, can_manage_billing FROM enfermeros WHERE id = $1',
         [req.session.enfermero_id]
       );
 
@@ -1577,6 +1935,7 @@ app.get('/api/status', async (req, res) => {
         usuario: {
           codigo: user.codigo,
           nombre: user.nombre,
+          rol: user.rol,
           can_manage_billing: user.can_manage_billing
         },
         debug: {
