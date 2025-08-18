@@ -116,7 +116,7 @@ function App() {
   return (
     <Router>
       <div className="App">
-        {enfermero && <Navbar enfermero={enfermero} onLogout={handleLogout} />}
+        {user && <Navbar enfermero={user} onLogout={handleLogout} />}
 
         <Routes>
           <Route
