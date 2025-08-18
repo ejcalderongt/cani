@@ -15,6 +15,8 @@ import NuevoMedicamento from './components/NuevoMedicamento';
 import MantenimientoUsuarios from './components/MantenimientoUsuarios';
 import ConfiguracionSistema from './components/ConfiguracionSistema';
 import ConfiguracionHospital from './components/ConfiguracionHospital';
+import ConfiguracionFacturacion from './components/ConfiguracionFacturacion';
+import Autocobro from './components/Autocobro';
 import ImprimirNotas from './components/ImprimirNotas';
 import CambiarClave from './components/CambiarClave';
 import NotasActuales from './components/NotasActuales';
@@ -27,8 +29,8 @@ axios.defaults.withCredentials = true;
 axios.defaults.timeout = 10000;
 
 // Determinar la URL base de la API
-const API_BASE_URL = process.env.NODE_ENV === 'production' 
-  ? window.location.origin 
+const API_BASE_URL = process.env.NODE_ENV === 'production'
+  ? window.location.origin
   : window.location.origin;
 
 function App() {
@@ -179,6 +181,19 @@ function App() {
             path="/admin/sistema"
             element={
               enfermero?.codigo === 'admin' ? <ConfiguracionSistema /> : <Navigate to="/" />
+            }
+          />
+
+          <Route
+            path="/configuracion-facturacion"
+            element={
+              enfermero?.codigo === 'admin' ? <ConfiguracionFacturacion /> : <Navigate to="/" />
+            }
+          />
+          <Route
+            path="/autocobro"
+            element={
+              enfermero?.codigo === 'admin' ? <Autocobro /> : <Navigate to="/" />
             }
           />
 

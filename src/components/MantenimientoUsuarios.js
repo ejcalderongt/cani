@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Card, Button, Table, Modal, Form, Alert } from 'react-bootstrap';
+import { Container, Card, Button, Table, Modal, Form, Alert, Badge } from 'react-bootstrap';
 import axios from 'axios';
 
 function MantenimientoUsuarios() {
@@ -16,7 +16,9 @@ function MantenimientoUsuarios() {
     apellidos: '',
     turno: 'mañana',
     activo: true,
-    debe_cambiar_clave: false
+    debe_cambiar_clave: false,
+    rol: '', // Added rol
+    can_manage_billing: false // Added billing permission
   });
 
   useEffect(() => {
@@ -36,6 +38,15 @@ function MantenimientoUsuarios() {
   };
 
   const handleChange = (e) => {
+    const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
+    setFormData({
+      ...formData,
+      [e.target.name]: value
+    });
+  };
+
+  // Renamed handleInputChange to handleChange to match the usage
+  const handleInputChange = (e) => {
     const value = e.target.type === 'checkbox' ? e.target.checked : e.target.value;
     setFormData({
       ...formData,
@@ -63,32 +74,26 @@ function MantenimientoUsuarios() {
 
       setShowModal(false);
       setEditingUser(null);
-      setFormData({
-        codigo: '',
-        clave: '',
-        nombre: '',
-        apellidos: '',
-        turno: 'mañana',
-        activo: true,
-        debe_cambiar_clave: false
-      });
+      clearForm(); // Use clearForm to reset
       fetchUsuarios();
     } catch (error) {
       setError(error.response?.data?.error || 'Error al guardar usuario');
     }
   };
 
-  const handleEdit = (usuario) => {
-    setEditingUser(usuario);
+  const handleEdit = (user) => {
     setFormData({
-      codigo: usuario.codigo,
-      clave: '',
-      nombre: usuario.nombre,
-      apellidos: usuario.apellidos,
-      turno: usuario.turno,
-      activo: usuario.activo,
-      debe_cambiar_clave: usuario.debe_cambiar_clave || false
+      codigo: user.codigo,
+      clave: '', // Don't pre-fill password for security
+      nombre: user.nombre,
+      apellidos: user.apellidos,
+      turno: user.turno,
+      activo: user.activo,
+      debe_cambiar_clave: user.debe_cambiar_clave || false,
+      rol: user.rol, // Added rol
+      can_manage_billing: user.can_manage_billing || false // Added billing permission
     });
+    setEditingUser(user);
     setShowModal(true);
   };
 
@@ -113,6 +118,11 @@ function MantenimientoUsuarios() {
 
   const openCreateModal = () => {
     setEditingUser(null);
+    clearForm(); // Use clearForm to reset
+    setShowModal(true);
+  };
+
+  const clearForm = () => {
     setFormData({
       codigo: '',
       clave: '',
@@ -120,9 +130,11 @@ function MantenimientoUsuarios() {
       apellidos: '',
       turno: 'mañana',
       activo: true,
-      debe_cambiar_clave: true
+      debe_cambiar_clave: false,
+      rol: '', // Reset rol
+      can_manage_billing: false // Reset billing permission
     });
-    setShowModal(true);
+    setEditingUser(null);
   };
 
   if (loading) {
@@ -159,7 +171,7 @@ function MantenimientoUsuarios() {
                 <th>Apellidos</th>
                 <th>Turno</th>
                 <th>Estado</th>
-                <th>Cambio Requerido</th>
+                <th>Permisos</th> {/* Added Permisos column */}
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -171,14 +183,17 @@ function MantenimientoUsuarios() {
                   <td>{usuario.apellidos}</td>
                   <td className="text-capitalize">{usuario.turno}</td>
                   <td>
-                    <span className={`badge bg-${usuario.activo ? 'success' : 'secondary'}`}>
+                    <Badge bg={usuario.activo ? 'success' : 'secondary'}>
                       {usuario.activo ? 'Activo' : 'Inactivo'}
-                    </span>
+                    </Badge>
                   </td>
-                  <td>
-                    <span className={`badge bg-${usuario.debe_cambiar_clave ? 'warning' : 'success'}`}>
-                      {usuario.debe_cambiar_clave ? 'Sí' : 'No'}
-                    </span>
+                  <td> {/* Permissions cell */}
+                    {usuario.rol === 'admin' && (
+                      <Badge bg="warning" className="me-1">Admin</Badge>
+                    )}
+                    {(usuario.can_manage_billing || usuario.rol === 'admin') && (
+                      <Badge bg="info">Facturación</Badge>
+                    )}
                   </td>
                   <td>
                     <Button
@@ -290,6 +305,46 @@ function MantenimientoUsuarios() {
                 </Form.Text>
               )}
             </Form.Group>
+
+            <div className="row">
+              <div className="col-md-6">
+                {/* Rol input */}
+                <Form.Group className="mb-3">
+                  <Form.Label>Rol</Form.Label>
+                  <Form.Select
+                    name="rol"
+                    value={formData.rol}
+                    onChange={handleInputChange}
+                    required
+                  >
+                    <option value="">Seleccionar rol</option>
+                    <option value="admin">Administrador</option>
+                    <option value="medico">Médico</option>
+                    <option value="enfermero">Enfermero</option>
+                    <option value="staff">Staff</option>
+                  </Form.Select>
+                </Form.Group>
+              </div>
+              <div className="col-md-6">
+                {/* Billing permission checkbox */}
+                <Form.Group className="mb-3">
+                  <Form.Check
+                    type="checkbox"
+                    name="can_manage_billing"
+                    checked={formData.can_manage_billing || false}
+                    onChange={handleInputChange}
+                    label="Puede ver y gestionar facturación"
+                    disabled={formData.rol === 'admin'} // Admin always has billing access
+                  />
+                  <Form.Text className="text-muted">
+                    {formData.rol === 'admin'
+                      ? 'Los administradores tienen acceso automático a la facturación'
+                      : 'Permite al usuario acceder al módulo de autocobro y generar documentos'
+                    }
+                  </Form.Text>
+                </Form.Group>
+              </div>
+            </div>
 
             {editingUser && (
               <div className="row">

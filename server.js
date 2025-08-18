@@ -30,7 +30,7 @@ app.use(cors({
         /https:\/\/.*\.repl\.co$/,
         /https:\/\/.*\.replit\.app$/
       ];
-      
+
       const isAllowed = allowedOrigins.some(pattern => pattern.test(origin));
       if (isAllowed) {
         callback(null, true);
@@ -821,7 +821,7 @@ app.post('/api/pacientes/:paciente_id/medicamentos', requireAuth, async (req, re
 // User management routes (admin only)
 app.get('/api/admin/usuarios', requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, codigo, nombre, apellidos, turno, activo, debe_cambiar_clave FROM enfermeros ORDER BY nombre');
+    const result = await pool.query('SELECT id, codigo, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing FROM enfermeros ORDER BY nombre');
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching usuarios:', error);
@@ -831,15 +831,15 @@ app.get('/api/admin/usuarios', requireAdmin, async (req, res) => {
 
 app.post('/api/admin/usuarios', requireAdmin, async (req, res) => {
   try {
-    const { codigo, clave, nombre, apellidos, turno } = req.body;
+    const { codigo, clave, nombre, apellidos, turno, activo, can_manage_billing } = req.body;
 
     const hashedPassword = await bcrypt.hash(clave, 10);
 
     const result = await pool.query(`
-      INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno)
-      VALUES ($1, $2, $3, $4, $5)
-      RETURNING id, codigo, nombre, apellidos, turno, activo
-    `, [codigo, hashedPassword, nombre, apellidos, turno]);
+      INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno, activo, debe_cambiar_clave, primer_login, can_manage_billing)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+      RETURNING id, codigo, nombre, apellidos, turno, activo, can_manage_billing
+    `, [codigo, hashedPassword, nombre, apellidos, turno, activo, true, true, can_manage_billing || false]);
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -855,24 +855,24 @@ app.post('/api/admin/usuarios', requireAdmin, async (req, res) => {
 app.put('/api/admin/usuarios/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { codigo, clave, nombre, apellidos, turno, activo, debe_cambiar_clave } = req.body;
+    const { codigo, clave, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing } = req.body;
 
     let query = `
       UPDATE enfermeros
-      SET codigo = $1, nombre = $2, apellidos = $3, turno = $4, activo = $5, debe_cambiar_clave = $6
+      SET codigo = $1, nombre = $2, apellidos = $3, turno = $4, activo = $5, debe_cambiar_clave = $6, can_manage_billing = $7
     `;
-    let params = [codigo, nombre, apellidos, turno, activo, debe_cambiar_clave, id];
+    let params = [codigo, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing || false, id];
 
     if (clave && clave.trim() !== '') {
       const hashedPassword = await bcrypt.hash(clave, 10);
       query = `
         UPDATE enfermeros
-        SET codigo = $1, clave = $2, nombre = $3, apellidos = $4, turno = $5, activo = $6, debe_cambiar_clave = $7
-        WHERE id = $8 RETURNING id, codigo, nombre, apellidos, turno, activo, debe_cambiar_clave
+        SET codigo = $1, clave = $2, nombre = $3, apellidos = $4, turno = $5, activo = $6, debe_cambiar_clave = $7, can_manage_billing = $8
+        WHERE id = $9 RETURNING id, codigo, nombre, apellidos, turno, activo, can_manage_billing
       `;
-      params = [codigo, hashedPassword, nombre, apellidos, turno, activo, debe_cambiar_clave, id];
+      params = [codigo, hashedPassword, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing || false, id];
     } else {
-      query += ` WHERE id = $7 RETURNING id, codigo, nombre, apellidos, turno, activo, debe_cambiar_clave`;
+      query += ` WHERE id = $8 RETURNING id, codigo, nombre, apellidos, turno, activo, can_manage_billing`;
     }
 
     const result = await pool.query(query, params);
@@ -1215,7 +1215,7 @@ app.put('/api/pacientes/:id/activo', requireAuth, async (req, res) => {
 app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
   try {
     console.log('Starting sample data insertion...');
-    
+
     // Check if database connection is available
     if (!process.env.DATABASE_URL) {
       return res.status(500).json({ 
@@ -1289,7 +1289,7 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
         pacientes[p.numero_expediente] = p.id;
       });
     }
-    
+
     // Always check for existing patients to ensure we have all IDs
     const existingPacientesResult = await pool.query(
       'SELECT id, numero_expediente FROM pacientes WHERE numero_expediente IN ($1, $2, $3)',
@@ -1402,7 +1402,7 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
 
     const message = 'Datos de ejemplo insertados correctamente. Se crearon 3 pacientes con sus respectivas notas de enfermería, medicamentos y signos vitales.';
     console.log('Sample data insertion completed successfully');
-    
+
     res.json({ message });
 
   } catch (error) {
@@ -1412,9 +1412,9 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
     } catch (rollbackError) {
       console.error('Error rolling back transaction:', rollbackError);
     }
-    
+
     console.error('Error inserting sample data:', error);
-    
+
     res.status(500).json({ 
       error: 'Error al insertar los datos de ejemplo: ' + (error.message || 'Error desconocido') 
     });
@@ -1425,7 +1425,7 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
 app.get('/api/configuracion-hospital', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM configuracion_hospital ORDER BY id LIMIT 1');
-    
+
     if (result.rows.length === 0) {
       // Return default configuration if none exists
       return res.json({
@@ -1438,7 +1438,7 @@ app.get('/api/configuracion-hospital', async (req, res) => {
         sitio_web: ''
       });
     }
-    
+
     res.json(result.rows[0]);
   } catch (error) {
     console.error('Error fetching hospital configuration:', error);
@@ -1555,7 +1555,7 @@ app.get('/api/status', async (req, res) => {
     try {
       // Check if user needs to change password
       const result = await pool.query(
-        'SELECT debe_cambiar_clave, codigo, nombre FROM enfermeros WHERE id = $1',
+        'SELECT debe_cambiar_clave, codigo, nombre, can_manage_billing FROM enfermeros WHERE id = $1',
         [req.session.enfermero_id]
       );
 
@@ -1576,7 +1576,8 @@ app.get('/api/status', async (req, res) => {
         requiere_cambio_clave: requiereCambio,
         usuario: {
           codigo: user.codigo,
-          nombre: user.nombre
+          nombre: user.nombre,
+          can_manage_billing: user.can_manage_billing
         },
         debug: {
           sessionId: req.session.id,

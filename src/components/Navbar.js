@@ -8,6 +8,9 @@ function NavbarComponent({ enfermero, onLogout }) {
     nombre_hospital: 'Sistema Hospitalario'
   });
 
+  // Use enfermero directly instead of creating a separate 'user' variable
+  const user = enfermero;
+
   useEffect(() => {
     fetchHospitalConfig();
 
@@ -48,7 +51,12 @@ function NavbarComponent({ enfermero, onLogout }) {
             <Nav.Link as={Link} to="/signos-vitales">❤️ Signos Vitales</Nav.Link>
             <Nav.Link as={Link} to="/medicamentos">💊 Medicamentos</Nav.Link>
             <Nav.Link as={Link} to="/imprimir-notas">Imprimir Notas</Nav.Link>
-            {enfermero?.codigo === 'admin' && (
+
+            {(user.can_manage_billing || user.rol === 'admin') && (
+              <Nav.Link as={Link} to="/autocobro">Autocobro</Nav.Link>
+            )}
+
+            {user.rol === 'admin' && (
               <NavDropdown title="Administración" id="admin-nav-dropdown">
                 <NavDropdown.Item as={Link} to="/admin/usuarios">
                   Gestión de Usuarios
@@ -56,6 +64,7 @@ function NavbarComponent({ enfermero, onLogout }) {
                 <NavDropdown.Item as={Link} to="/admin/hospital">
                   Configuración del Hospital
                 </NavDropdown.Item>
+                <NavDropdown.Item as={Link} to="/configuracion-facturacion">Configuración de Facturación</NavDropdown.Item>
                 <NavDropdown.Item as={Link} to="/admin/sistema">
                   Configuración del Sistema
                 </NavDropdown.Item>
@@ -65,9 +74,9 @@ function NavbarComponent({ enfermero, onLogout }) {
 
           <Nav>
             <Navbar.Text className="me-3">
-              👤 {enfermero.nombre && enfermero.apellidos
-                ? `${enfermero.nombre} ${enfermero.apellidos}`
-                : enfermero.codigo || 'Usuario'}
+              👤 {user.nombre && user.apellidos
+                ? `${user.nombre} ${user.apellidos}`
+                : user.codigo || 'Usuario'}
             </Navbar.Text>
             <Nav.Link onClick={onLogout}>
               Cerrar Sesión
