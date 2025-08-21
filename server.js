@@ -810,33 +810,6 @@ app.post('/api/pacientes', requireAuth, async (req, res) => {
     });
   }
 });
-    } = req.body;
-
-    const result = await pool.query(`
-      INSERT INTO pacientes (
-        numero_expediente, nombre, apellidos, fecha_nacimiento, documento_identidad,
-        nacionalidad, contacto_emergencia_nombre, contacto_emergencia_telefono,
-        telefono_principal, telefono_secundario, tipo_sangre, peso, estatura,
-        padecimientos, informacion_general, tipo_paciente, cuarto_asignado,
-        sexo, fecha_ingreso, motivo_ingreso, fase_tratamiento, unidad_cama, medico_tratante,
-        equipo_tratante, riesgo_suicidio, riesgo_violencia, riesgo_fuga, riesgo_caidas
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
-      RETURNING *
-    `, [
-      numero_expediente, nombre, apellidos, fecha_nacimiento, documento_identidad,
-      nacionalidad, contacto_emergencia_nombre, contacto_emergencia_telefono,
-      telefono_principal, telefono_secundario, tipo_sangre, peso, estatura,
-      padecimientos, informacion_general, tipo_paciente, cuarto_asignado,
-      sexo, fecha_ingreso, motivo_ingreso, fase_tratamiento, unidad_cama, medico_tratante,
-      equipo_tratante, riesgo_suicidio, riesgo_violencia, riesgo_fuga, riesgo_caidas
-    ]);
-
-    res.status(201).json(result.rows[0]);
-  } catch (error) {
-    console.error('Error creating paciente:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
-  }
-});
 
 app.get('/api/pacientes/:id', requireAuth, async (req, res) => {
   try {
