@@ -15,10 +15,10 @@ function MantenimientoUsuarios() {
     nombre: '',
     apellidos: '',
     turno: 'mañana',
+    numero_colegiado: '',
     activo: true,
-    debe_cambiar_clave: false,
-    rol: '', // Added rol
-    can_manage_billing: false // Added billing permission
+    can_manage_billing: false, // Changed from puede_facturar to can_manage_billing for consistency
+    rol: 'staff'
   });
 
   useEffect(() => {
@@ -88,10 +88,10 @@ function MantenimientoUsuarios() {
       nombre: user.nombre,
       apellidos: user.apellidos,
       turno: user.turno,
+      numero_colegiado: user.numero_colegiado || '',
       activo: user.activo,
-      debe_cambiar_clave: user.debe_cambiar_clave || false,
-      rol: user.rol, // Added rol
-      can_manage_billing: user.can_manage_billing || false // Added billing permission
+      can_manage_billing: user.can_manage_billing || false, // Updated key
+      rol: user.rol || 'staff'
     });
     setEditingUser(user);
     setShowModal(true);
@@ -129,10 +129,10 @@ function MantenimientoUsuarios() {
       nombre: '',
       apellidos: '',
       turno: 'mañana',
+      numero_colegiado: '',
       activo: true,
-      debe_cambiar_clave: false,
-      rol: '', // Reset rol
-      can_manage_billing: false // Reset billing permission
+      can_manage_billing: false, // Changed from puede_facturar to can_manage_billing
+      rol: 'staff'
     });
     setEditingUser(null);
   };
@@ -148,6 +148,29 @@ function MantenimientoUsuarios() {
       </Container>
     );
   }
+
+  // Helper function to get role badge color
+  const getRoleBadgeColor = (role) => {
+    switch (role) {
+      case 'admin': return 'bg-danger';
+      case 'medico': return 'bg-primary';
+      case 'enfermero': return 'bg-success';
+      case 'staff': return 'bg-secondary';
+      default: return 'bg-dark';
+    }
+  };
+
+  // Helper function to get display name for role
+  const getRoleDisplayName = (role) => {
+    switch (role) {
+      case 'admin': return 'Admin';
+      case 'medico': return 'Médico';
+      case 'enfermero': return 'Enfermero';
+      case 'staff': return 'Staff';
+      default: return 'Desconocido';
+    }
+  };
+
 
   return (
     <Container className="mt-4">
@@ -170,8 +193,10 @@ function MantenimientoUsuarios() {
                 <th>Nombre</th>
                 <th>Apellidos</th>
                 <th>Turno</th>
+                <th>N° Colegiado</th>
+                <th>Rol</th>
                 <th>Estado</th>
-                <th>Permisos</th> {/* Added Permisos column */}
+                <th>Facturación</th>
                 <th>Acciones</th>
               </tr>
             </thead>
@@ -182,18 +207,21 @@ function MantenimientoUsuarios() {
                   <td>{usuario.nombre}</td>
                   <td>{usuario.apellidos}</td>
                   <td className="text-capitalize">{usuario.turno}</td>
+                  <td>{usuario.numero_colegiado || '-'}</td>
+                  <td>
+                    <span className={`badge ${getRoleBadgeColor(usuario.rol)}`}>
+                      {getRoleDisplayName(usuario.rol)}
+                    </span>
+                  </td>
                   <td>
                     <Badge bg={usuario.activo ? 'success' : 'secondary'}>
                       {usuario.activo ? 'Activo' : 'Inactivo'}
                     </Badge>
                   </td>
-                  <td> {/* Permissions cell */}
-                    {usuario.rol === 'admin' && (
-                      <Badge bg="warning" className="me-1">Admin</Badge>
-                    )}
-                    {(usuario.can_manage_billing || usuario.rol === 'admin') && (
-                      <Badge bg="info">Facturación</Badge>
-                    )}
+                  <td>
+                    <Badge bg={usuario.can_manage_billing ? 'info' : 'secondary'}>
+                      {usuario.can_manage_billing ? 'Sí' : 'No'}
+                    </Badge>
                   </td>
                   <td>
                     <Button
@@ -305,6 +333,56 @@ function MantenimientoUsuarios() {
                 </Form.Text>
               )}
             </Form.Group>
+
+            <div className="row">
+              <div className="col-md-4">
+                <Form.Group className="mb-3">
+                  <Form.Label>Turno *</Form.Label>
+                  <Form.Select
+                    name="turno"
+                    value={formData.turno}
+                    onChange={handleInputChange}
+                    required
+                  >
+                    <option value="mañana">Mañana</option>
+                    <option value="tarde">Tarde</option>
+                    <option value="noche">Noche</option>
+                    <option value="todos">Todos</option>
+                  </Form.Select>
+                </Form.Group>
+              </div>
+              <div className="col-md-4">
+                <Form.Group className="mb-3">
+                  <Form.Label>Número de Colegiado</Form.Label>
+                  <Form.Control
+                    type="text"
+                    name="numero_colegiado"
+                    value={formData.numero_colegiado}
+                    onChange={handleInputChange}
+                    placeholder="Ej: ENF-1234"
+                  />
+                  <Form.Text className="text-muted">
+                    Opcional para enfermeros
+                  </Form.Text>
+                </Form.Group>
+              </div>
+              <div className="col-md-4">
+                <Form.Group className="mb-3">
+                  <Form.Label>Rol *</Form.Label>
+                  <Form.Select
+                    name="rol"
+                    value={formData.rol}
+                    onChange={handleInputChange}
+                    required
+                  >
+                    <option value="staff">Staff</option>
+                    <option value="enfermero">Enfermero</option>
+                    <option value="admin">Administrador</option>
+                    <option value="medico">Médico</option>
+                  </Form.Select>
+                </Form.Group>
+              </div>
+            </div>
 
             <div className="row">
               <div className="col-md-6">

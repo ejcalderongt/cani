@@ -157,11 +157,28 @@ async function initDatabase() {
         nombre VARCHAR(100) NOT NULL,
         apellidos VARCHAR(100) NOT NULL,
         turno VARCHAR(20) NOT NULL,
+        numero_colegiado VARCHAR(50),
         activo BOOLEAN DEFAULT true,
         debe_cambiar_password BOOLEAN DEFAULT false,
         primer_login BOOLEAN DEFAULT true,
         rol VARCHAR(20) DEFAULT 'staff',
         can_manage_billing BOOLEAN DEFAULT false
+      )
+    `);
+
+    // Create terapeutas table
+    await pool.query(`
+      CREATE TABLE IF NOT EXISTS terapeutas (
+        id SERIAL PRIMARY KEY,
+        nombre VARCHAR(100) NOT NULL,
+        apellidos VARCHAR(100) NOT NULL,
+        fecha_nacimiento DATE,
+        numero_colegiado VARCHAR(50),
+        especialidad VARCHAR(100),
+        telefono VARCHAR(20),
+        email VARCHAR(100),
+        activo BOOLEAN DEFAULT true,
+        fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       )
     `);
 
@@ -192,6 +209,7 @@ async function initDatabase() {
         fase_tratamiento VARCHAR(50),
         unidad_cama VARCHAR(20),
         medico_tratante VARCHAR(100),
+        terapeuta_tratante_id INTEGER REFERENCES terapeutas(id),
         equipo_tratante TEXT,
         riesgo_suicidio BOOLEAN DEFAULT false,
         riesgo_violencia BOOLEAN DEFAULT false,
@@ -333,6 +351,8 @@ async function initDatabase() {
       await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS medico_autoriza VARCHAR(100)`);
       await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS enfermero_autoriza VARCHAR(100)`);
       await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS director_autoriza VARCHAR(100)`);
+      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS terapeuta_tratante_id INTEGER REFERENCES terapeutas(id)`);
+      await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS numero_colegiado VARCHAR(50)`);
     } catch (error) {
       // Columns might already exist
     }
@@ -741,7 +761,7 @@ app.post('/api/pacientes', requireAuth, async (req, res) => {
       telefono_principal, telefono_secundario, tipo_sangre, peso, estatura,
       padecimientos, informacion_general, tipo_paciente, cuarto_asignado,
       sexo, fecha_ingreso, motivo_ingreso, fase_tratamiento, unidad_cama, medico_tratante,
-      equipo_tratante, riesgo_suicidio, riesgo_violencia, riesgo_fuga, riesgo_caidas
+      terapeuta_tratante_id, equipo_tratante, riesgo_suicidio, riesgo_violencia, riesgo_fuga, riesgo_caidas
     } = req.body;
 
     // Validar campos requeridos (verificar que no sean null, undefined o strings vacíos)
@@ -778,6 +798,7 @@ app.post('/api/pacientes', requireAuth, async (req, res) => {
       fase_tratamiento || '',
       unidad_cama || '',
       medico_tratante || '',
+      terapeuta_tratante_id || null,
       equipo_tratante || '',
       riesgo_suicidio || false,
       riesgo_violencia || false,
@@ -792,8 +813,8 @@ app.post('/api/pacientes', requireAuth, async (req, res) => {
         telefono_principal, telefono_secundario, tipo_sangre, peso, estatura,
         padecimientos, informacion_general, tipo_paciente, cuarto_asignado,
         sexo, fecha_ingreso, motivo_ingreso, fase_tratamiento, unidad_cama, medico_tratante,
-        equipo_tratante, riesgo_suicidio, riesgo_violencia, riesgo_fuga, riesgo_caidas
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
+        terapeuta_tratante_id, equipo_tratante, riesgo_suicidio, riesgo_violencia, riesgo_fuga, riesgo_caidas
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, $29)
       RETURNING *
     `, values);
 
@@ -815,7 +836,12 @@ app.get('/api/pacientes/:id', requireAuth, async (req, res) => {
   try {
     const { id } = req.params;
 
-    const pacienteResult = await pool.query('SELECT * FROM pacientes WHERE id = $1', [id]);
+    const pacienteResult = await pool.query(`
+      SELECT p.*, t.nombre as terapeuta_nombre, t.apellidos as terapeuta_apellidos, t.especialidad as terapeuta_especialidad
+      FROM pacientes p 
+      LEFT JOIN terapeutas t ON p.terapeuta_tratante_id = t.id
+      WHERE p.id = $1
+    `, [id]);
     if (pacienteResult.rows.length === 0) {
       return res.status(404).json({ error: 'Paciente no encontrado' });
     }
@@ -1250,10 +1276,94 @@ TOTAL,,,${invoice.total_amount},${invoice.currency}`;
   }
 });
 
+// Therapists management routes (admin only)
+app.get('/api/admin/terapeutas', requireAdmin, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT * FROM terapeutas WHERE activo = true ORDER BY nombre, apellidos');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching terapeutas:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.post('/api/admin/terapeutas', requireAdmin, async (req, res) => {
+  try {
+    const { nombre, apellidos, fecha_nacimiento, numero_colegiado, especialidad, telefono, email } = req.body;
+
+    if (!nombre || !apellidos) {
+      return res.status(400).json({ error: 'Nombre y apellidos son obligatorios' });
+    }
+
+    const result = await pool.query(`
+      INSERT INTO terapeutas (nombre, apellidos, fecha_nacimiento, numero_colegiado, especialidad, telefono, email)
+      VALUES ($1, $2, $3, $4, $5, $6, $7)
+      RETURNING *
+    `, [nombre, apellidos, fecha_nacimiento, numero_colegiado, especialidad, telefono, email]);
+
+    res.status(201).json(result.rows[0]);
+  } catch (error) {
+    console.error('Error creating terapeuta:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.put('/api/admin/terapeutas/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+    const { nombre, apellidos, fecha_nacimiento, numero_colegiado, especialidad, telefono, email, activo } = req.body;
+
+    const result = await pool.query(`
+      UPDATE terapeutas
+      SET nombre = $1, apellidos = $2, fecha_nacimiento = $3, numero_colegiado = $4, 
+          especialidad = $5, telefono = $6, email = $7, activo = $8
+      WHERE id = $9
+      RETURNING *
+    `, [nombre, apellidos, fecha_nacimiento, numero_colegiado, especialidad, telefono, email, activo, id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Terapeuta no encontrado' });
+    }
+
+    res.json(result.rows[0]);
+  } catch (error) {
+    console.error('Error updating terapeuta:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+app.delete('/api/admin/terapeutas/:id', requireAdmin, async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const result = await pool.query('UPDATE terapeutas SET activo = false WHERE id = $1 RETURNING *', [id]);
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Terapeuta no encontrado' });
+    }
+
+    res.json({ message: 'Terapeuta desactivado correctamente' });
+  } catch (error) {
+    console.error('Error deactivating terapeuta:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
+// Get active therapists for patient form
+app.get('/api/terapeutas', requireAuth, async (req, res) => {
+  try {
+    const result = await pool.query('SELECT id, nombre, apellidos, especialidad FROM terapeutas WHERE activo = true ORDER BY nombre, apellidos');
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Error fetching terapeutas:', error);
+    res.status(500).json({ error: 'Error interno del servidor' });
+  }
+});
+
 // User management routes (admin only)
 app.get('/api/admin/usuarios', requireAdmin, async (req, res) => {
   try {
-    const result = await pool.query('SELECT id, codigo, nombre, apellidos, turno, activo, debe_cambiar_clave, rol, can_manage_billing FROM enfermeros ORDER BY nombre');
+    const result = await pool.query('SELECT id, codigo, nombre, apellidos, turno, numero_colegiado, activo, debe_cambiar_clave, rol, can_manage_billing FROM enfermeros ORDER BY nombre');
     res.json(result.rows);
   } catch (error) {
     console.error('Error fetching usuarios:', error);
@@ -1263,7 +1373,7 @@ app.get('/api/admin/usuarios', requireAdmin, async (req, res) => {
 
 app.post('/api/admin/usuarios', requireAdmin, async (req, res) => {
   try {
-    const { codigo, clave, nombre, apellidos, turno, activo, can_manage_billing, rol } = req.body;
+    const { codigo, clave, nombre, apellidos, turno, numero_colegiado, activo, can_manage_billing, rol } = req.body;
 
     if (!clave || clave.trim() === '') {
       return res.status(400).json({ error: 'La contraseña es obligatoria' });
@@ -1272,10 +1382,10 @@ app.post('/api/admin/usuarios', requireAdmin, async (req, res) => {
     const hashedPassword = await bcrypt.hash(clave, 10);
 
     const result = await pool.query(`
-      INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno, activo, debe_cambiar_clave, primer_login, can_manage_billing, rol)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-      RETURNING id, codigo, nombre, apellidos, turno, activo, can_manage_billing, rol
-    `, [codigo, hashedPassword, nombre, apellidos, turno, activo, true, true, can_manage_billing || false, rol || 'staff']);
+      INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno, numero_colegiado, activo, debe_cambiar_clave, primer_login, can_manage_billing, rol)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+      RETURNING id, codigo, nombre, apellidos, turno, numero_colegiado, activo, can_manage_billing, rol
+    `, [codigo, hashedPassword, nombre, apellidos, turno, numero_colegiado, activo, true, true, can_manage_billing || false, rol || 'staff']);
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -1291,26 +1401,26 @@ app.post('/api/admin/usuarios', requireAdmin, async (req, res) => {
 app.put('/api/admin/usuarios/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { codigo, clave, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing, rol } = req.body;
+    const { codigo, clave, nombre, apellidos, turno, numero_colegiado, activo, debe_cambiar_clave, can_manage_billing, rol } = req.body;
 
     let query = `
       UPDATE enfermeros
-      SET codigo = $1, nombre = $2, apellidos = $3, turno = $4, activo = $5, debe_cambiar_clave = $6, can_manage_billing = $7, rol = $8
+      SET codigo = $1, nombre = $2, apellidos = $3, turno = $4, numero_colegiado = $5, activo = $6, debe_cambiar_clave = $7, can_manage_billing = $8, rol = $9
     `;
-    let params = [codigo, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing || false, rol || 'staff', id];
+    let params = [codigo, nombre, apellidos, turno, numero_colegiado, activo, debe_cambiar_clave, can_manage_billing || false, rol || 'staff', id];
 
     if (clave && clave.trim() !== '') {
       const hashedPassword = await bcrypt.hash(clave, 10);
       query = `
         UPDATE enfermeros
-        SET codigo = $1, clave = $2, nombre = $3, apellidos = $4, turno = $5, activo = $6, debe_cambiar_clave = $7, can_manage_billing = $8, rol = $9
-        WHERE id = $10 RETURNING id, codigo, nombre, apellidos, turno, activo, can_manage_billing, rol
+        SET codigo = $1, clave = $2, nombre = $3, apellidos = $4, turno = $5, numero_colegiado = $6, activo = $7, debe_cambiar_clave = $8, can_manage_billing = $9, rol = $10
+        WHERE id = $11 RETURNING id, codigo, nombre, apellidos, turno, numero_colegiado, activo, can_manage_billing, rol
       `;
-      params = [codigo, hashedPassword, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing || false, rol || 'staff', id];
+      params = [codigo, hashedPassword, nombre, apellidos, turno, numero_colegiado, activo, debe_cambiar_clave, can_manage_billing || false, rol || 'staff', id];
     } else {
-      query += ` WHERE id = $8 RETURNING id, codigo, nombre, apellidos, turno, activo, can_manage_billing, rol`;
+      query += ` WHERE id = $10 RETURNING id, codigo, nombre, apellidos, turno, numero_colegiado, activo, can_manage_billing, rol`;
       // Adjust parameters for the case where password is not updated
-      params = [codigo, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing || false, rol || 'staff', id];
+      params = [codigo, nombre, apellidos, turno, numero_colegiado, activo, debe_cambiar_clave, can_manage_billing || false, rol || 'staff', id];
     }
 
     const result = await pool.query(query, params);

@@ -13,6 +13,7 @@ import SignosVitales from './components/SignosVitales';
 import Medicamentos from './components/Medicamentos';
 import NuevoMedicamento from './components/NuevoMedicamento';
 import MantenimientoUsuarios from './components/MantenimientoUsuarios';
+import MantenimientoTerapeutas from './components/MantenimientoTerapeutas';
 import ConfiguracionSistema from './components/ConfiguracionSistema';
 import ConfiguracionHospital from './components/ConfiguracionHospital';
 import ConfiguracionFacturacion from './components/ConfiguracionFacturacion';
@@ -208,19 +209,9 @@ function App() {
               user?.rol === 'admin' ? <ConfiguracionSistema /> : <Navigate to="/" />
             }
           />
-
           <Route
-            path="/admin/hospital"
-            element={
-              user?.rol === 'admin' ? <ConfiguracionHospital /> : <Navigate to="/" />
-            }
-          />
-
-          <Route
-            path="/configuracion-facturacion"
-            element={
-              user?.rol === 'admin' ? <ConfiguracionFacturacion /> : <Navigate to="/" />
-            }
+            path="/mantenimiento-terapeutas"
+            element={<MantenimientoTerapeutas />}
           />
           <Route
             path="/autocobro"

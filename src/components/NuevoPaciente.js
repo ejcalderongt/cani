@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Container, Card, Form, Button, Row, Col, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
@@ -9,6 +9,7 @@ function NuevoPaciente() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [terapeutas, setTerapeutas] = useState([]);
   const [formData, setFormData] = useState({
     numero_expediente: '',
     nombre: '',
@@ -33,12 +34,26 @@ function NuevoPaciente() {
     fase_tratamiento: '',
     unidad_cama: '',
     medico_tratante: '',
+    terapeuta_tratante_id: '',
     equipo_tratante: '',
     riesgo_suicidio: false,
     riesgo_violencia: false,
     riesgo_fuga: false,
     riesgo_caidas: false
   });
+
+  useEffect(() => {
+    fetchTerapeutas();
+  }, []);
+
+  const fetchTerapeutas = async () => {
+    try {
+      const response = await axios.get('/api/terapeutas');
+      setTerapeutas(response.data);
+    } catch (error) {
+      console.error('Error fetching terapeutas:', error);
+    }
+  };
 
   // Generate expedition number suggestion based on birth date
   const generateExpeditionNumber = (birthDate) => {
@@ -128,6 +143,7 @@ function NuevoPaciente() {
       fase_tratamiento: formData.fase_tratamiento || '',
       unidad_cama: formData.unidad_cama?.trim() || '',
       medico_tratante: formData.medico_tratante?.trim() || '',
+      terapeuta_tratante_id: formData.terapeuta_tratante_id ? parseInt(formData.terapeuta_tratante_id) : null,
       equipo_tratante: formData.equipo_tratante?.trim() || '',
       riesgo_suicidio: Boolean(formData.riesgo_suicidio),
       riesgo_violencia: Boolean(formData.riesgo_violencia),
@@ -164,6 +180,7 @@ function NuevoPaciente() {
         fase_tratamiento: '',
         unidad_cama: '',
         medico_tratante: '',
+        terapeuta_tratante_id: '',
         equipo_tratante: '',
         riesgo_suicidio: false,
         riesgo_violencia: false,
@@ -524,6 +541,30 @@ function NuevoPaciente() {
                 </Form.Group>
               </Col>
               <Col md={6}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Terapeuta Tratante</Form.Label>
+                  <Form.Select
+                    name="terapeuta_tratante_id"
+                    value={formData.terapeuta_tratante_id}
+                    onChange={handleChange}
+                  >
+                    <option value="">Seleccionar terapeuta...</option>
+                    {terapeutas.map(terapeuta => (
+                      <option key={terapeuta.id} value={terapeuta.id}>
+                        {terapeuta.nombre} {terapeuta.apellidos}
+                        {terapeuta.especialidad && ` - ${terapeuta.especialidad}`}
+                      </option>
+                    ))}
+                  </Form.Select>
+                  <Form.Text className="text-muted">
+                    Si no encuentra el terapeuta, contacte al administrador para agregarlo
+                  </Form.Text>
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <Row>
+              <Col md={12}>
                 <Form.Group className="mb-3">
                   <Form.Label>Equipo Tratante</Form.Label>
                   <Form.Control

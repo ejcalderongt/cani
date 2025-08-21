@@ -61,9 +61,10 @@ function NavbarComponent({ enfermero, onLogout }) {
                 <NavDropdown.Item as={Link} to="/admin/usuarios">
                   Gestión de Usuarios
                 </NavDropdown.Item>
-                <NavDropdown.Item as={Link} to="/admin/hospital">
-                  Configuración del Hospital
+                <NavDropdown.Item as={Link} to="/mantenimiento-terapeutas">
+                  Mantenimiento de Terapeutas
                 </NavDropdown.Item>
+                <NavDropdown.Divider />
                 <NavDropdown.Item as={Link} to="/configuracion-facturacion">Configuración de Facturación</NavDropdown.Item>
                 <NavDropdown.Item as={Link} to="/admin/sistema">
                   Configuración del Sistema
