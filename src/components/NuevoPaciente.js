@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Container, Card, Form, Button, Row, Col, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
@@ -68,92 +67,84 @@ function NuevoPaciente() {
     e.preventDefault();
     setLoading(true);
     setError('');
+    setSuccess('');
 
-    // Validate required fields
-    const requiredFields = [
-      { field: 'numero_expediente', name: 'Número de Expediente' },
-      { field: 'nombre', name: 'Nombre' },
-      { field: 'apellidos', name: 'Apellidos' },
-      { field: 'fecha_nacimiento', name: 'Fecha de Nacimiento' },
-      { field: 'sexo', name: 'Sexo' },
-      { field: 'documento_identidad', name: 'Documento de Identidad' },
-      { field: 'nacionalidad', name: 'Nacionalidad' },
-      { field: 'telefono_principal', name: 'Teléfono Principal' },
-      { field: 'tipo_paciente', name: 'Tipo de Paciente' }
-    ];
-
-    const missingFields = requiredFields.filter(({ field }) => !formData[field]?.toString().trim());
-    
-    if (missingFields.length > 0) {
-      setError(`Los siguientes campos son obligatorios: ${missingFields.map(({ name }) => name).join(', ')}`);
+    // Validación básica de campos obligatorios
+    if (!formData.numero_expediente?.trim() || !formData.nombre?.trim() || !formData.apellidos?.trim() ||
+        !formData.fecha_nacimiento || !formData.sexo || !formData.documento_identidad?.trim() ||
+        !formData.nacionalidad?.trim() || !formData.tipo_paciente || !formData.fecha_ingreso) {
+      setError('Por favor, completa todos los campos obligatorios marcados con *');
       setLoading(false);
       return;
     }
 
-    // Validate numeric fields if provided
-    if (formData.peso && (isNaN(formData.peso) || parseFloat(formData.peso) <= 0)) {
-      setError('El peso debe ser un número positivo');
-      setLoading(false);
-      return;
-    }
-
-    if (formData.estatura && (isNaN(formData.estatura) || parseFloat(formData.estatura) <= 0)) {
-      setError('La estatura debe ser un número positivo');
-      setLoading(false);
-      return;
-    }
-
-    // Validate birth date is not in the future
-    if (new Date(formData.fecha_nacimiento) > new Date()) {
-      setError('La fecha de nacimiento no puede ser en el futuro');
-      setLoading(false);
-      return;
-    }
+    // Preparar datos para envío, asegurando que campos opcionales sean strings vacíos
+    const dataToSend = {
+      ...formData,
+      contacto_emergencia_nombre: formData.contacto_emergencia_nombre || '',
+      contacto_emergencia_telefono: formData.contacto_emergencia_telefono || '',
+      telefono_principal: formData.telefono_principal || '',
+      telefono_secundario: formData.telefono_secundario || '',
+      tipo_sangre: formData.tipo_sangre || '',
+      peso: formData.peso || '',
+      estatura: formData.estatura || '',
+      padecimientos: formData.padecimientos || '',
+      informacion_general: formData.informacion_general || '',
+      cuarto_asignado: formData.cuarto_asignado || '',
+      motivo_ingreso: formData.motivo_ingreso || '',
+      fase_tratamiento: formData.fase_tratamiento || '',
+      unidad_cama: formData.unidad_cama || '',
+      medico_tratante: formData.medico_tratante || '',
+      equipo_tratante: formData.equipo_tratante || ''
+    };
 
     try {
-      // Prepare data with proper formatting
-      const dataToSend = {
-        ...formData,
-        // Ensure empty strings are converted to null for optional fields
-        contacto_emergencia_nombre: formData.contacto_emergencia_nombre || null,
-        contacto_emergencia_telefono: formData.contacto_emergencia_telefono || null,
-        telefono_secundario: formData.telefono_secundario || null,
-        tipo_sangre: formData.tipo_sangre || null,
-        peso: formData.peso ? parseFloat(formData.peso) : null,
-        estatura: formData.estatura ? parseFloat(formData.estatura) : null,
-        padecimientos: formData.padecimientos || null,
-        informacion_general: formData.informacion_general || null,
-        cuarto_asignado: formData.cuarto_asignado || null,
-        fecha_ingreso: formData.fecha_ingreso || new Date().toISOString(),
-        motivo_ingreso: formData.motivo_ingreso || null,
-        fase_tratamiento: formData.fase_tratamiento || null,
-        unidad_cama: formData.unidad_cama || null,
-        medico_tratante: formData.medico_tratante || null,
-        equipo_tratante: formData.equipo_tratante || null
-      };
-
       const response = await axios.post('/api/pacientes', dataToSend);
-      
-      // Show success message briefly before redirecting
-      setError('');
-      alert('Paciente creado exitosamente');
-      navigate('/pacientes');
+      setSuccess('Paciente registrado exitosamente');
+
+      // Reset form
+      setFormData({
+        numero_expediente: '',
+        nombre: '',
+        apellidos: '',
+        fecha_nacimiento: '',
+        sexo: '',
+        documento_identidad: '',
+        nacionalidad: '',
+        contacto_emergencia_nombre: '',
+        contacto_emergencia_telefono: '',
+        telefono_principal: '',
+        telefono_secundario: '',
+        tipo_sangre: '',
+        peso: '',
+        estatura: '',
+        padecimientos: '',
+        informacion_general: '',
+        tipo_paciente: '',
+        cuarto_asignado: '',
+        fecha_ingreso: '',
+        motivo_ingreso: '',
+        fase_tratamiento: '',
+        unidad_cama: '',
+        medico_tratante: '',
+        equipo_tratante: '',
+        riesgo_suicidio: false,
+        riesgo_violencia: false,
+        riesgo_fuga: false,
+        riesgo_caidas: false
+      });
+
+      // Redirect to patient list after 2 seconds
+      setTimeout(() => {
+        navigate('/pacientes');
+      }, 2000);
     } catch (error) {
       console.error('Error creating patient:', error);
-      
-      let errorMessage = 'Error al crear paciente';
-      
-      if (error.response?.data?.message) {
-        errorMessage = error.response.data.message;
-      } else if (error.response?.status === 400) {
-        errorMessage = 'Error en los datos enviados. Verifique los campos obligatorios.';
-      } else if (error.response?.status === 500) {
-        errorMessage = 'Error interno del servidor. Contacte al administrador.';
-      } else if (error.code === 'NETWORK_ERROR') {
-        errorMessage = 'Error de conexión. Verifique su conexión a internet.';
+      if (error.response && error.response.status === 400) {
+        setError('Error de validación: ' + (error.response.data.error || 'Datos inválidos'));
+      } else {
+        setError('Error al registrar el paciente');
       }
-      
-      setError(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -169,7 +160,7 @@ function NuevoPaciente() {
         <Card.Body>
           <Form onSubmit={handleSubmit}>
             <h5 className="text-primary mb-3">
-              Datos Básicos 
+              Datos Básicos
               <small className="text-muted"> - Los campos marcados con <span style={{color: 'red'}}>*</span> son obligatorios</small>
             </h5>
             <Row>
@@ -563,9 +554,9 @@ function NuevoPaciente() {
               <Button type="submit" variant="primary" disabled={loading}>
                 {loading ? 'Guardando...' : 'Guardar Paciente'}
               </Button>
-              <Button 
-                type="button" 
-                variant="secondary" 
+              <Button
+                type="button"
+                variant="secondary"
                 onClick={() => navigate('/pacientes')}
               >
                 Cancelar

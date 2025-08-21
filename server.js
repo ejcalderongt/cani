@@ -5,6 +5,7 @@ const session = require('express-session');
 const pgSession = require('connect-pg-simple')(session);
 const path = require('path');
 const bcrypt = require('bcryptjs');
+const axios = require('axios'); // Import axios for inter-service communication
 
 const app = express();
 const port = process.env.PORT || 5000;
@@ -39,7 +40,7 @@ app.use(cors({
         callback(new Error('Not allowed by CORS'));
       }
     } else {
-      // Development - allow localhost
+      // Development - allow localhost and Replit origins
       const allowedOrigins = [
         'http://localhost:3000',
         'http://localhost:3001',
@@ -86,7 +87,10 @@ app.use('/static', express.static(path.join(__dirname, 'build/static')));
 
 // Add logging middleware to debug requests
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url}`, req.body ? JSON.stringify(req.body) : '');
+  // Only log non-API requests to keep the console cleaner for API interactions
+  if (!req.path.startsWith('/api/')) {
+    console.log(`${req.method} ${req.url}`);
+  }
   next();
 });
 
@@ -99,12 +103,12 @@ app.use(session({
   resave: false,
   saveUninitialized: false,
   cookie: {
-    secure: false, // Cambiar a false temporalmente para debug
+    secure: process.env.NODE_ENV === 'production', // Use secure cookies in production
     httpOnly: true,
     maxAge: 30 * 24 * 60 * 60 * 1000, // 30 days
-    sameSite: 'lax' // Añadir para mejor compatibilidad
+    sameSite: 'lax' // Best practice for session cookies
   },
-  name: 'hospital.session' // Nombre específico para la sesión
+  name: 'hospital.session' // Specific name for the session cookie
 }));
 
 // Initialize database tables
@@ -154,7 +158,10 @@ async function initDatabase() {
         apellidos VARCHAR(100) NOT NULL,
         turno VARCHAR(20) NOT NULL,
         activo BOOLEAN DEFAULT true,
-        debe_cambiar_password BOOLEAN DEFAULT false
+        debe_cambiar_password BOOLEAN DEFAULT false,
+        primer_login BOOLEAN DEFAULT true,
+        rol VARCHAR(20) DEFAULT 'staff',
+        can_manage_billing BOOLEAN DEFAULT false
       )
     `);
 
@@ -179,18 +186,26 @@ async function initDatabase() {
         informacion_general TEXT,
         tipo_paciente VARCHAR(20) NOT NULL,
         cuarto_asignado VARCHAR(10),
+        sexo VARCHAR(20),
+        fecha_ingreso TIMESTAMP,
+        motivo_ingreso VARCHAR(100),
+        fase_tratamiento VARCHAR(50),
+        unidad_cama VARCHAR(20),
+        medico_tratante VARCHAR(100),
+        equipo_tratante TEXT,
+        riesgo_suicidio BOOLEAN DEFAULT false,
+        riesgo_violencia BOOLEAN DEFAULT false,
+        riesgo_fuga BOOLEAN DEFAULT false,
+        riesgo_caidas BOOLEAN DEFAULT false,
+        fecha_salida DATE,
+        observaciones_alta TEXT,
+        medico_autoriza VARCHAR(100),
+        enfermero_autoriza VARCHAR(100),
+        director_autoriza VARCHAR(100),
         fecha_registro TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         activo BOOLEAN DEFAULT true
       )
     `);
-
-    // Add peso and estatura columns if they don't exist
-    try {
-      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS peso DECIMAL(5,2)`);
-      await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS estatura DECIMAL(3,2)`);
-    } catch (error) {
-      // Columns might already exist
-    }
 
     // Create notas_enfermeria table
     await pool.query(`
@@ -297,10 +312,11 @@ async function initDatabase() {
 
     // Add columns to existing tables if they don't exist
     try {
-      // Add debe_cambiar_password column to enfermeros
-      await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS debe_cambiar_password BOOLEAN DEFAULT false`);
+      await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS debe_cambiar_clave BOOLEAN DEFAULT false`);
+      await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS primer_login BOOLEAN DEFAULT true`);
+      await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS rol VARCHAR(20) DEFAULT 'staff'`);
+      await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS can_manage_billing BOOLEAN DEFAULT false`);
 
-      // Add patient columns
       await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS sexo VARCHAR(20)`);
       await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS fecha_ingreso TIMESTAMP`);
       await pool.query(`ALTER TABLE pacientes ADD COLUMN IF NOT EXISTS motivo_ingreso VARCHAR(100)`);
@@ -353,14 +369,6 @@ async function initDatabase() {
       )
     `);
 
-    // Add columns for password change requirement if they don't exist
-    try {
-      await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS debe_cambiar_clave BOOLEAN DEFAULT false`);
-      await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS primer_login BOOLEAN DEFAULT true`);
-    } catch (error) {
-      // Columns might already exist
-    }
-
     // Create billing settings table
     await pool.query(`
       CREATE TABLE IF NOT EXISTS billing_settings (
@@ -408,14 +416,6 @@ async function initDatabase() {
         action VARCHAR(20) NOT NULL
       )
     `);
-
-    // Add billing and role columns to enfermeros if they don't exist
-    try {
-      await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS rol VARCHAR(20) DEFAULT 'staff'`);
-      await pool.query(`ALTER TABLE enfermeros ADD COLUMN IF NOT EXISTS can_manage_billing BOOLEAN DEFAULT false`);
-    } catch (error) {
-      // Columns might already exist
-    }
 
     // Insert default billing settings if not exists
     const billingSettingsExists = await pool.query('SELECT id FROM billing_settings LIMIT 1');
@@ -497,17 +497,22 @@ const requireAuth = (req, res, next) => {
 
 // Admin-only middleware
 const requireAdmin = async (req, res, next) => {
-  if (!req.session.enfermero_id) {
+  if (!req.session || !req.session.enfermero_id) {
     return res.status(401).json({ error: 'No autenticado' });
   }
 
   try {
-    const result = await pool.query('SELECT codigo FROM enfermeros WHERE id = $1', [req.session.enfermero_id]);
-    if (result.rows.length === 0 || result.rows[0].codigo !== 'admin') {
+    const result = await pool.query('SELECT codigo, rol FROM enfermeros WHERE id = $1', [req.session.enfermero_id]);
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Usuario no encontrado' });
+    }
+    
+    if (result.rows[0].rol !== 'admin') {
       return res.status(403).json({ error: 'Acceso denegado. Solo administradores.' });
     }
     next();
   } catch (error) {
+    console.error('Error in requireAdmin middleware:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
@@ -550,7 +555,9 @@ app.post('/api/login', async (req, res) => {
             nombre: enfermero.nombre,
             apellidos: enfermero.apellidos,
             turno: enfermero.turno,
-            activo: enfermero.activo
+            activo: enfermero.activo,
+            rol: enfermero.rol,
+            can_manage_billing: enfermero.can_manage_billing
           }
         });
       } else {
@@ -572,8 +579,13 @@ app.post('/api/login', async (req, res) => {
 });
 
 app.post('/api/logout', (req, res) => {
-  req.session.destroy();
-  res.json({ success: true });
+  req.session.destroy((err) => {
+    if (err) {
+      console.error('Error destroying session:', err);
+      return res.status(500).json({ success: false, message: 'Error al cerrar sesión' });
+    }
+    res.json({ success: true });
+  });
 });
 
 app.post('/api/cambiar-clave', async (req, res) => {
@@ -730,35 +742,45 @@ app.post('/api/pacientes', requireAuth, async (req, res) => {
       equipo_tratante, riesgo_suicidio, riesgo_violencia, riesgo_fuga, riesgo_caidas
     } = req.body;
 
-    // Validar campos requeridos
-    const requiredFields = [
-      'numero_expediente', 'nombre', 'apellidos', 'fecha_nacimiento', 
-      'documento_identidad', 'nacionalidad', 'telefono_principal', 'tipo_paciente'
-    ];
-
-    for (const field of requiredFields) {
-      if (!req.body[field] || req.body[field].toString().trim() === '') {
-        return res.status(400).json({ 
-          message: `El campo ${field} es obligatorio` 
-        });
-      }
-    }
-
-    // Convertir campos numéricos
-    const pesoNum = peso ? parseFloat(peso) : null;
-    const estaturaNum = estatura ? parseFloat(estatura) : null;
-
-    // Verificar si el número de expediente ya existe
-    const existingPatient = await pool.query(
-      'SELECT id FROM pacientes WHERE numero_expediente = $1',
-      [numero_expediente]
-    );
-
-    if (existingPatient.rows.length > 0) {
-      return res.status(400).json({ 
-        message: 'Ya existe un paciente con este número de expediente' 
+    // Validar campos requeridos (verificar que no sean null, undefined o strings vacíos)
+    if (!numero_expediente?.trim() || !nombre?.trim() || !apellidos?.trim() || !fecha_nacimiento ||
+        !documento_identidad?.trim() || !nacionalidad?.trim() || !tipo_paciente || !sexo || !fecha_ingreso) {
+      return res.status(400).json({
+        error: 'Faltan campos obligatorios: número de expediente, nombre, apellidos, fecha de nacimiento, documento de identidad, nacionalidad, tipo de paciente, sexo y fecha de ingreso son requeridos'
       });
     }
+
+    // Preparar valores, convirtiendo null/undefined a string vacío para campos opcionales
+    const values = [
+      numero_expediente.trim(),
+      nombre.trim(),
+      apellidos.trim(),
+      fecha_nacimiento,
+      documento_identidad.trim(),
+      nacionalidad.trim(),
+      contacto_emergencia_nombre || '',
+      contacto_emergencia_telefono || '',
+      telefono_principal || '',
+      telefono_secundario || '',
+      tipo_sangre || '',
+      peso || '', // Keep as empty string if null/undefined for DB to handle potential nulls
+      estatura || '', // Keep as empty string if null/undefined for DB to handle potential nulls
+      padecimientos || '',
+      informacion_general || '',
+      tipo_paciente,
+      cuarto_asignado || '',
+      sexo,
+      fecha_ingreso,
+      motivo_ingreso || '',
+      fase_tratamiento || '',
+      unidad_cama || '',
+      medico_tratante || '',
+      equipo_tratante || '',
+      riesgo_suicidio || false,
+      riesgo_violencia || false,
+      riesgo_fuga || false,
+      riesgo_caidas || false
+    ];
 
     const result = await pool.query(`
       INSERT INTO pacientes (
@@ -766,48 +788,23 @@ app.post('/api/pacientes', requireAuth, async (req, res) => {
         nacionalidad, contacto_emergencia_nombre, contacto_emergencia_telefono,
         telefono_principal, telefono_secundario, tipo_sangre, peso, estatura,
         padecimientos, informacion_general, tipo_paciente, cuarto_asignado,
-        sexo, fecha_ingreso, motivo_ingreso, fase_tratamiento, unidad_cama, 
-        medico_tratante, equipo_tratante, riesgo_suicidio, riesgo_violencia, 
-        riesgo_fuga, riesgo_caidas, activo
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 
-                $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, true)
+        sexo, fecha_ingreso, motivo_ingreso, fase_tratamiento, unidad_cama, medico_tratante,
+        equipo_tratante, riesgo_suicidio, riesgo_violencia, riesgo_fuga, riesgo_caidas
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28)
       RETURNING *
-    `, [
-      numero_expediente, nombre, apellidos, fecha_nacimiento, documento_identidad,
-      nacionalidad, contacto_emergencia_nombre || null, contacto_emergencia_telefono || null,
-      telefono_principal, telefono_secundario || null, tipo_sangre || null, 
-      pesoNum, estaturaNum, padecimientos || null, informacion_general || null, 
-      tipo_paciente, cuarto_asignado || null, sexo, 
-      fecha_ingreso || new Date().toISOString(), motivo_ingreso || null, 
-      fase_tratamiento || null, unidad_cama || null, medico_tratante || null, 
-      equipo_tratante || null, riesgo_suicidio || false, riesgo_violencia || false, 
-      riesgo_fuga || false, riesgo_caidas || false
-    ]);
+    `, values);
 
-    res.status(201).json({
-      message: 'Paciente creado exitosamente',
-      paciente: result.rows[0]
-    });
+    res.status(201).json(result.rows[0]);
   } catch (error) {
-    console.error('Error creating patient:', error);
-    
-    // Proporcionar mensaje de error más específico
-    if (error.code === '23505') { // Duplicate key violation
-      return res.status(400).json({ 
-        message: 'Ya existe un paciente con este número de expediente o documento de identidad' 
-      });
+    console.error('Error creating paciente:', error);
+    if (error.code === '23505') { // Unique violation for numero_expediente or document_identidad if it were unique
+      res.status(400).json({ error: 'Ya existe un paciente con ese número de expediente o documento de identidad' });
+    } else if (error.code === '23502') { // Not null violation for fields that should have been caught by earlier validation
+      res.status(400).json({ error: 'Faltan campos obligatorios que no fueron validados correctamente.' });
     }
-    
-    if (error.code === '23502') { // Not null violation
-      return res.status(400).json({ 
-        message: 'Faltan campos obligatorios en el formulario' 
-      });
+    else {
+      res.status(500).json({ error: 'Error interno del servidor: ' + error.message });
     }
-    
-    res.status(500).json({ 
-      message: 'Error interno del servidor al crear el paciente',
-      error: process.env.NODE_ENV === 'development' ? error.message : undefined
-    });
   }
 });
 
@@ -940,7 +937,7 @@ app.post('/api/pacientes/:paciente_id/medicamentos', requireAuth, async (req, re
 
 // Billing permission middleware
 const requireBillingAccess = async (req, res, next) => {
-  if (!req.session.enfermero_id) {
+  if (!req.session || !req.session.enfermero_id) {
     return res.status(401).json({ error: 'No autenticado' });
   }
 
@@ -957,6 +954,7 @@ const requireBillingAccess = async (req, res, next) => {
       return res.status(403).json({ error: 'Acceso denegado. Requiere permisos de facturación.' });
     }
   } catch (error) {
+    console.error('Error in requireBillingAccess middleware:', error);
     res.status(500).json({ error: 'Error interno del servidor' });
   }
 };
@@ -985,8 +983,8 @@ app.put('/api/admin/billing-settings', requireAdmin, async (req, res) => {
 
     // Update settings
     const result = await pool.query(`
-      UPDATE billing_settings 
-      SET server_monthly_fee = $1, annual_maintenance_fee = $2, per_patient_fee = $3, 
+      UPDATE billing_settings
+      SET server_monthly_fee = $1, annual_maintenance_fee = $2, per_patient_fee = $3,
           currency = $4, prorate_annual_maintenance = $5, active_patient_rule = $6,
           updated_by_user_id = $7, updated_at = CURRENT_TIMESTAMP
       RETURNING *
@@ -1021,7 +1019,7 @@ app.put('/api/admin/billing-settings', requireAdmin, async (req, res) => {
 app.get('/api/admin/billing-settings/audit', requireAdmin, async (req, res) => {
   try {
     const result = await pool.query(`
-      SELECT ba.*, e.nombre, e.apellidos 
+      SELECT ba.*, e.nombre, e.apellidos
       FROM billing_audit ba
       JOIN enfermeros e ON ba.changed_by_user_id = e.id
       ORDER BY ba.changed_at DESC
@@ -1055,11 +1053,11 @@ app.get('/api/billing/summary', requireBillingAccess, async (req, res) => {
     let activePatients = 0;
     if (settings.active_patient_rule === 'status_active') {
       const activeResult = await pool.query(`
-        SELECT COUNT(*) as count 
-        FROM pacientes 
-        WHERE activo = true 
-        AND (fecha_ingreso IS NULL OR DATE_PART('year', fecha_ingreso) <= $1)
-        AND (fecha_salida IS NULL OR (DATE_PART('year', fecha_salida) > $1 OR 
+        SELECT COUNT(*) as count
+        FROM pacientes
+        WHERE activo = true
+        AND (fecha_ingreso IS NULL OR DATE_PART('year', fecha_ingreso) <= $1 AND DATE_PART('month', fecha_ingreso) <= $2)
+        AND (fecha_salida IS NULL OR (DATE_PART('year', fecha_salida) > $1 OR
              (DATE_PART('year', fecha_salida) = $1 AND DATE_PART('month', fecha_salida) >= $2)))
       `, [year, month]);
       activePatients = parseInt(activeResult.rows[0].count);
@@ -1073,7 +1071,7 @@ app.get('/api/billing/summary', requireBillingAccess, async (req, res) => {
 
     const patientsFeeTotalFee = activePatients * perPatientFee;
     const annualMaintenanceComponent = prorateAnnualMaintenance ? annualMaintenanceFee / 12 : 0;
-    
+
     const total = serverMonthlyFee + patientsFeeTotalFee + annualMaintenanceComponent;
 
     res.json({
@@ -1116,7 +1114,9 @@ app.post('/api/billing/generate', requireBillingAccess, async (req, res) => {
     }
 
     // Get current billing summary
-    const summaryResponse = await axios.get(`/api/billing/summary?year=${year}&month=${month}`, {
+    // Make sure to use the correct URL and pass cookies if necessary for inter-service calls
+    const summaryUrl = `${req.protocol}://${req.get('host')}/api/billing/summary?year=${year}&month=${month}`;
+    const summaryResponse = await axios.get(summaryUrl, {
       headers: { cookie: req.headers.cookie }
     });
     const summary = summaryResponse.data;
@@ -1142,7 +1142,23 @@ app.post('/api/billing/generate', requireBillingAccess, async (req, res) => {
 
   } catch (error) {
     console.error('Error generating invoice:', error);
-    res.status(500).json({ error: 'Error interno del servidor' });
+    // Provide more specific error messages if possible
+    if (error.response) {
+      // The request was made and the server responded with a status code
+      // that falls out of the range of 2xx
+      console.error('Error data:', error.response.data);
+      console.error('Error status:', error.response.status);
+      console.error('Error headers:', error.response.headers);
+      res.status(error.response.status).json({ error: error.response.data.error || 'Error al obtener resumen de facturación' });
+    } else if (error.request) {
+      // The request was made but no response was received
+      console.error('Error request:', error.request);
+      res.status(500).json({ error: 'No se recibió respuesta al generar el resumen de facturación' });
+    } else {
+      // Something happened in setting up the request that triggered an Error
+      console.error('Error message:', error.message);
+      res.status(500).json({ error: 'Error interno del servidor al generar la factura' });
+    }
   }
 });
 
@@ -1173,13 +1189,13 @@ app.get('/api/billing/invoices/:id/download.pdf', requireBillingAccess, async (r
   try {
     const { id } = req.params;
     const result = await pool.query('SELECT * FROM invoices WHERE id = $1', [id]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Documento no encontrado' });
     }
 
     const invoice = result.rows[0];
-    
+
     // Generate simple PDF content (you could use a library like PDFKit for better formatting)
     const pdfContent = `
 FACTURACIÓN MENSUAL
@@ -1208,13 +1224,13 @@ app.get('/api/billing/invoices/:id/download.csv', requireBillingAccess, async (r
   try {
     const { id } = req.params;
     const result = await pool.query('SELECT * FROM invoices WHERE id = $1', [id]);
-    
+
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Documento no encontrado' });
     }
 
     const invoice = result.rows[0];
-    
+
     const csvContent = `Concepto,Cantidad,Precio Unitario,Total,Moneda
 Cargo fijo del servidor,1,${invoice.server_monthly_fee},${invoice.server_monthly_fee},${invoice.currency}
 Pacientes activos,${invoice.active_patients_count},${invoice.per_patient_fee},${(invoice.active_patients_count * invoice.per_patient_fee).toFixed(2)},${invoice.currency}
@@ -1244,15 +1260,19 @@ app.get('/api/admin/usuarios', requireAdmin, async (req, res) => {
 
 app.post('/api/admin/usuarios', requireAdmin, async (req, res) => {
   try {
-    const { codigo, clave, nombre, apellidos, turno, activo, can_manage_billing } = req.body;
+    const { codigo, clave, nombre, apellidos, turno, activo, can_manage_billing, rol } = req.body;
+
+    if (!clave || clave.trim() === '') {
+      return res.status(400).json({ error: 'La contraseña es obligatoria' });
+    }
 
     const hashedPassword = await bcrypt.hash(clave, 10);
 
     const result = await pool.query(`
-      INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno, activo, debe_cambiar_clave, primer_login, can_manage_billing)
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
-      RETURNING id, codigo, nombre, apellidos, turno, activo, can_manage_billing
-    `, [codigo, hashedPassword, nombre, apellidos, turno, activo, true, true, can_manage_billing || false]);
+      INSERT INTO enfermeros (codigo, clave, nombre, apellidos, turno, activo, debe_cambiar_clave, primer_login, can_manage_billing, rol)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+      RETURNING id, codigo, nombre, apellidos, turno, activo, can_manage_billing, rol
+    `, [codigo, hashedPassword, nombre, apellidos, turno, activo, true, true, can_manage_billing || false, rol || 'staff']);
 
     res.status(201).json(result.rows[0]);
   } catch (error) {
@@ -1268,24 +1288,26 @@ app.post('/api/admin/usuarios', requireAdmin, async (req, res) => {
 app.put('/api/admin/usuarios/:id', requireAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    const { codigo, clave, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing } = req.body;
+    const { codigo, clave, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing, rol } = req.body;
 
     let query = `
       UPDATE enfermeros
-      SET codigo = $1, nombre = $2, apellidos = $3, turno = $4, activo = $5, debe_cambiar_clave = $6, can_manage_billing = $7
+      SET codigo = $1, nombre = $2, apellidos = $3, turno = $4, activo = $5, debe_cambiar_clave = $6, can_manage_billing = $7, rol = $8
     `;
-    let params = [codigo, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing || false, id];
+    let params = [codigo, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing || false, rol || 'staff', id];
 
     if (clave && clave.trim() !== '') {
       const hashedPassword = await bcrypt.hash(clave, 10);
       query = `
         UPDATE enfermeros
-        SET codigo = $1, clave = $2, nombre = $3, apellidos = $4, turno = $5, activo = $6, debe_cambiar_clave = $7, can_manage_billing = $8
-        WHERE id = $9 RETURNING id, codigo, nombre, apellidos, turno, activo, can_manage_billing
+        SET codigo = $1, clave = $2, nombre = $3, apellidos = $4, turno = $5, activo = $6, debe_cambiar_clave = $7, can_manage_billing = $8, rol = $9
+        WHERE id = $10 RETURNING id, codigo, nombre, apellidos, turno, activo, can_manage_billing, rol
       `;
-      params = [codigo, hashedPassword, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing || false, id];
+      params = [codigo, hashedPassword, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing || false, rol || 'staff', id];
     } else {
-      query += ` WHERE id = $8 RETURNING id, codigo, nombre, apellidos, turno, activo, can_manage_billing`;
+      query += ` WHERE id = $8 RETURNING id, codigo, nombre, apellidos, turno, activo, can_manage_billing, rol`;
+      // Adjust parameters for the case where password is not updated
+      params = [codigo, nombre, apellidos, turno, activo, debe_cambiar_clave, can_manage_billing || false, rol || 'staff', id];
     }
 
     const result = await pool.query(query, params);
@@ -1631,8 +1653,8 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
 
     // Check if database connection is available
     if (!process.env.DATABASE_URL) {
-      return res.status(500).json({ 
-        error: 'No hay conexión a la base de datos configurada. Configure PostgreSQL en la pestaña Database.' 
+      return res.status(500).json({
+        error: 'No hay conexión a la base de datos configurada. Configure PostgreSQL en la pestaña Database.'
       });
     }
 
@@ -1643,8 +1665,8 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
     const enfermerosResult = await pool.query('SELECT id, codigo FROM enfermeros WHERE activo = true ORDER BY id LIMIT 4');
     if (enfermerosResult.rows.length < 2) {
       await pool.query('ROLLBACK');
-      return res.status(500).json({ 
-        error: 'No hay suficientes usuarios activos en el sistema para crear los datos de ejemplo.' 
+      return res.status(500).json({
+        error: 'No hay suficientes usuarios activos en el sistema para crear los datos de ejemplo.'
       });
     }
 
@@ -1690,8 +1712,8 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
       'EXP003', 'Miguel Ángel', 'Ruiz Medina', '1978-11-08', '001-081178-3045N',
       'Nicaragüense', 'Elena Ruiz', '8222-6789', '8111-3456', '8000-7890',
       'B+', 82.3, 1.80, 'Alcoholismo crónico con cirrosis inicial',
-      'Paciente cooperativo en tratamiento', 'externo', NULL,
-      'Masculino', '2025-01-12 10:00:00', 'consulta_externa', 'seguimiento', NULL,
+      'Paciente cooperativo en tratamiento', 'externo', null, // Assuming cuarto_asignado can be null for externs
+      'Masculino', '2025-01-12 10:00:00', 'consulta_externa', 'seguimiento', null, // Assuming unidad_cama can be null for externs
       'Dr. Francisco Gómez', 'Equipo Gamma', false, false, false, false
     ]);
 
@@ -1717,8 +1739,8 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
     // Validate we have patients before proceeding
     if (Object.keys(pacientes).length === 0) {
       await pool.query('ROLLBACK');
-      return res.status(500).json({ 
-        error: 'No se pudieron crear o encontrar los pacientes necesarios para los datos de ejemplo.' 
+      return res.status(500).json({
+        error: 'No se pudieron crear o encontrar los pacientes necesarios para los datos de ejemplo.'
       });
     }
 
@@ -1731,8 +1753,8 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
     // Validate all IDs are valid numbers
     if (!validPacienteId1 || !validPacienteId2 || !validPacienteId3) {
       await pool.query('ROLLBACK');
-      return res.status(500).json({ 
-        error: 'Error: No se pudieron obtener IDs válidos de pacientes.' 
+      return res.status(500).json({
+        error: 'Error: No se pudieron obtener IDs válidos de pacientes.'
       });
     }
 
@@ -1782,7 +1804,7 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
         ($3, $4, 110, 70, 99.0, 88, 36.8, 'Ligera taquicardia, relacionada con ansiedad'),
         ($5, $6, 140, 90, 97.8, 76, 36.4, 'Hipertensión leve, requiere seguimiento')
       `, [
-        validPacienteId1, enf1, 
+        validPacienteId1, enf1,
         validPacienteId2, enf2,
         validPacienteId3, enf3
       ]);
@@ -1828,8 +1850,8 @@ app.post('/api/admin/insert-sample-data', requireAdmin, async (req, res) => {
 
     console.error('Error inserting sample data:', error);
 
-    res.status(500).json({ 
-      error: 'Error al insertar los datos de ejemplo: ' + (error.message || 'Error desconocido') 
+    res.status(500).json({
+      error: 'Error al insertar los datos de ejemplo: ' + (error.message || 'Error desconocido')
     });
   }
 });
@@ -1878,7 +1900,7 @@ app.put('/api/configuracion-hospital', requireAdmin, async (req, res) => {
       // Update existing configuration
       result = await pool.query(`
         UPDATE configuracion_hospital
-        SET nombre_hospital = $1, logo_base64 = $2, direccion = $3, telefono = $4, 
+        SET nombre_hospital = $1, logo_base64 = $2, direccion = $3, telefono = $4,
             email = $5, sitio_web = $6, fecha_actualizacion = CURRENT_TIMESTAMP
         WHERE id = $7
         RETURNING *
@@ -1908,6 +1930,7 @@ app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
     await pool.query('DELETE FROM notas_enfermeria');
     await pool.query('DELETE FROM pacientes');
     await pool.query('DELETE FROM medicamentos');
+    await pool.query('DELETE FROM session'); // Also clear sessions
 
     // Reset sequences
     await pool.query('ALTER SEQUENCE citas_seguimiento_id_seq RESTART WITH 1');
@@ -1919,6 +1942,7 @@ app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
     await pool.query('ALTER SEQUENCE notas_enfermeria_id_seq RESTART WITH 1');
     await pool.query('ALTER SEQUENCE pacientes_id_seq RESTART WITH 1');
     await pool.query('ALTER SEQUENCE medicamentos_id_seq RESTART WITH 1');
+    // Note: session sequence reset is not standard or typically needed; sessions are managed by their SIDs.
 
     // Insert some default medications
     await pool.query(`
@@ -1928,6 +1952,7 @@ app.post('/api/admin/reset-database', requireAdmin, async (req, res) => {
       ('Amoxicilina', 'Antibiótico de amplio espectro', 'mg'),
       ('Omeprazol', 'Inhibidor de la bomba de protones', 'mg'),
       ('Aspirina', 'Ácido acetilsalicílico', 'mg')
+      ON CONFLICT (nombre) DO NOTHING
     `);
 
     // Commit transaction
@@ -1955,13 +1980,14 @@ app.get('/api/health', (req, res) => {
   });
 });
 
-// Database status endpoint for debugging
+// Status endpoint for debugging and authentication check
 app.get('/api/status', async (req, res) => {
   console.log('Status check:', {
     sessionExists: !!req.session,
     sessionId: req.session?.id,
-    enfermeroId: req.session?.enfermero_id,
-    cookies: req.headers.cookie
+    enfermero_id: req.session?.enfermero_id,
+    cookies: req.headers.cookie,
+    path: req.path
   });
 
   if (req.session && req.session.enfermero_id) {
@@ -1973,7 +1999,9 @@ app.get('/api/status', async (req, res) => {
       );
 
       if (result.rows.length === 0) {
-        console.log('User not found in database');
+        console.log('User not found in database for status check');
+        // Destroy session if user is not found
+        req.session.destroy();
         return res.json({
           authenticated: false,
           error: 'Usuario no encontrado',
@@ -2026,15 +2054,21 @@ app.get('*', (req, res) => {
     return res.status(404).json({ error: 'API endpoint not found' });
   }
 
-  // Log non-API requests
+  // Log non-API requests to the console for debugging frontend routing
   console.log(`Serving React app for: ${req.path}`);
 
   // Serve React build files
   const indexPath = path.join(__dirname, 'build', 'index.html');
   res.sendFile(indexPath, (err) => {
     if (err) {
-      console.error('Error serving index.html:', err);
-      res.status(500).send('Error loading application');
+      // If index.html is not found, it might mean the build is missing or incomplete
+      console.error(`Error serving ${indexPath}:`, err);
+      // Provide a more informative error to the client
+      if (err.code === 'ENOENT') {
+        res.status(404).send('Application build not found. Please ensure the frontend is built.');
+      } else {
+        res.status(500).send('Error loading application');
+      }
     }
   });
 });
@@ -2042,6 +2076,7 @@ app.get('*', (req, res) => {
 // Start server
 initDatabase().then(() => {
   app.listen(port, '0.0.0.0', () => {
+    console.log('==========================================');
     console.log(`Hospital System Server running on http://0.0.0.0:${port}`);
     console.log(`Environment: ${process.env.NODE_ENV || 'development'}`);
     console.log(`Database URL configured: ${!!process.env.DATABASE_URL}`);
@@ -2054,11 +2089,12 @@ initDatabase().then(() => {
     }
   });
 }).catch(error => {
-  console.error('Database initialization failed, but server will continue:', error);
+  console.error('Database initialization failed, but server will attempt to start:', error);
   console.log('Some features may not work without a database. Set up PostgreSQL in the Database tab.');
 
-  // Start server anyway
+  // Start server anyway, but with a warning
   app.listen(port, '0.0.0.0', () => {
+    console.log('==========================================');
     console.log(`Hospital System Server running on http://0.0.0.0:${port} (LIMITED MODE - NO DATABASE)`);
     console.log('To enable full functionality, set up a PostgreSQL database in the Database tab.');
     console.log('==========================================');
