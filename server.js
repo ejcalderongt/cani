@@ -730,6 +730,88 @@ app.post('/api/pacientes', requireAuth, async (req, res) => {
       equipo_tratante, riesgo_suicidio, riesgo_violencia, riesgo_fuga, riesgo_caidas
     } = req.body;
 
+    // Validar campos requeridos
+    const requiredFields = [
+      'numero_expediente', 'nombre', 'apellidos', 'fecha_nacimiento', 
+      'documento_identidad', 'nacionalidad', 'telefono_principal', 'tipo_paciente'
+    ];
+
+    for (const field of requiredFields) {
+      if (!req.body[field] || req.body[field].toString().trim() === '') {
+        return res.status(400).json({ 
+          message: `El campo ${field} es obligatorio` 
+        });
+      }
+    }
+
+    // Convertir campos numéricos
+    const pesoNum = peso ? parseFloat(peso) : null;
+    const estaturaNum = estatura ? parseFloat(estatura) : null;
+
+    // Verificar si el número de expediente ya existe
+    const existingPatient = await pool.query(
+      'SELECT id FROM pacientes WHERE numero_expediente = $1',
+      [numero_expediente]
+    );
+
+    if (existingPatient.rows.length > 0) {
+      return res.status(400).json({ 
+        message: 'Ya existe un paciente con este número de expediente' 
+      });
+    }
+
+    const result = await pool.query(`
+      INSERT INTO pacientes (
+        numero_expediente, nombre, apellidos, fecha_nacimiento, documento_identidad,
+        nacionalidad, contacto_emergencia_nombre, contacto_emergencia_telefono,
+        telefono_principal, telefono_secundario, tipo_sangre, peso, estatura,
+        padecimientos, informacion_general, tipo_paciente, cuarto_asignado,
+        sexo, fecha_ingreso, motivo_ingreso, fase_tratamiento, unidad_cama, 
+        medico_tratante, equipo_tratante, riesgo_suicidio, riesgo_violencia, 
+        riesgo_fuga, riesgo_caidas, activo
+      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, 
+                $16, $17, $18, $19, $20, $21, $22, $23, $24, $25, $26, $27, $28, true)
+      RETURNING *
+    `, [
+      numero_expediente, nombre, apellidos, fecha_nacimiento, documento_identidad,
+      nacionalidad, contacto_emergencia_nombre || null, contacto_emergencia_telefono || null,
+      telefono_principal, telefono_secundario || null, tipo_sangre || null, 
+      pesoNum, estaturaNum, padecimientos || null, informacion_general || null, 
+      tipo_paciente, cuarto_asignado || null, sexo, 
+      fecha_ingreso || new Date().toISOString(), motivo_ingreso || null, 
+      fase_tratamiento || null, unidad_cama || null, medico_tratante || null, 
+      equipo_tratante || null, riesgo_suicidio || false, riesgo_violencia || false, 
+      riesgo_fuga || false, riesgo_caidas || false
+    ]);
+
+    res.status(201).json({
+      message: 'Paciente creado exitosamente',
+      paciente: result.rows[0]
+    });
+  } catch (error) {
+    console.error('Error creating patient:', error);
+    
+    // Proporcionar mensaje de error más específico
+    if (error.code === '23505') { // Duplicate key violation
+      return res.status(400).json({ 
+        message: 'Ya existe un paciente con este número de expediente o documento de identidad' 
+      });
+    }
+    
+    if (error.code === '23502') { // Not null violation
+      return res.status(400).json({ 
+        message: 'Faltan campos obligatorios en el formulario' 
+      });
+    }
+    
+    res.status(500).json({ 
+      message: 'Error interno del servidor al crear el paciente',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+});
+    } = req.body;
+
     const result = await pool.query(`
       INSERT INTO pacientes (
         numero_expediente, nombre, apellidos, fecha_nacimiento, documento_identidad,

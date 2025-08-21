@@ -82,7 +82,7 @@ function NuevoPaciente() {
       { field: 'tipo_paciente', name: 'Tipo de Paciente' }
     ];
 
-    const missingFields = requiredFields.filter(({ field }) => !formData[field]?.trim());
+    const missingFields = requiredFields.filter(({ field }) => !formData[field]?.toString().trim());
     
     if (missingFields.length > 0) {
       setError(`Los siguientes campos son obligatorios: ${missingFields.map(({ name }) => name).join(', ')}`);
@@ -90,16 +90,70 @@ function NuevoPaciente() {
       return;
     }
 
+    // Validate numeric fields if provided
+    if (formData.peso && (isNaN(formData.peso) || parseFloat(formData.peso) <= 0)) {
+      setError('El peso debe ser un número positivo');
+      setLoading(false);
+      return;
+    }
+
+    if (formData.estatura && (isNaN(formData.estatura) || parseFloat(formData.estatura) <= 0)) {
+      setError('La estatura debe ser un número positivo');
+      setLoading(false);
+      return;
+    }
+
+    // Validate birth date is not in the future
+    if (new Date(formData.fecha_nacimiento) > new Date()) {
+      setError('La fecha de nacimiento no puede ser en el futuro');
+      setLoading(false);
+      return;
+    }
+
     try {
-      // Set fecha_ingreso to current datetime if not provided
+      // Prepare data with proper formatting
       const dataToSend = {
         ...formData,
-        fecha_ingreso: formData.fecha_ingreso || new Date().toISOString()
+        // Ensure empty strings are converted to null for optional fields
+        contacto_emergencia_nombre: formData.contacto_emergencia_nombre || null,
+        contacto_emergencia_telefono: formData.contacto_emergencia_telefono || null,
+        telefono_secundario: formData.telefono_secundario || null,
+        tipo_sangre: formData.tipo_sangre || null,
+        peso: formData.peso ? parseFloat(formData.peso) : null,
+        estatura: formData.estatura ? parseFloat(formData.estatura) : null,
+        padecimientos: formData.padecimientos || null,
+        informacion_general: formData.informacion_general || null,
+        cuarto_asignado: formData.cuarto_asignado || null,
+        fecha_ingreso: formData.fecha_ingreso || new Date().toISOString(),
+        motivo_ingreso: formData.motivo_ingreso || null,
+        fase_tratamiento: formData.fase_tratamiento || null,
+        unidad_cama: formData.unidad_cama || null,
+        medico_tratante: formData.medico_tratante || null,
+        equipo_tratante: formData.equipo_tratante || null
       };
-      await axios.post('/api/pacientes', dataToSend);
+
+      const response = await axios.post('/api/pacientes', dataToSend);
+      
+      // Show success message briefly before redirecting
+      setError('');
+      alert('Paciente creado exitosamente');
       navigate('/pacientes');
     } catch (error) {
-      setError(error.response?.data?.message || 'Error al crear paciente');
+      console.error('Error creating patient:', error);
+      
+      let errorMessage = 'Error al crear paciente';
+      
+      if (error.response?.data?.message) {
+        errorMessage = error.response.data.message;
+      } else if (error.response?.status === 400) {
+        errorMessage = 'Error en los datos enviados. Verifique los campos obligatorios.';
+      } else if (error.response?.status === 500) {
+        errorMessage = 'Error interno del servidor. Contacte al administrador.';
+      } else if (error.code === 'NETWORK_ERROR') {
+        errorMessage = 'Error de conexión. Verifique su conexión a internet.';
+      }
+      
+      setError(errorMessage);
     } finally {
       setLoading(false);
     }
