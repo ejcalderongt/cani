@@ -28,8 +28,11 @@ function ImprimirNotas() {
   useEffect(() => {
     if (fechaInicio && fechaFin && fechaInicio > fechaFin) {
       setError('La fecha de inicio no puede ser mayor que la fecha de fin');
+    } else if (error && error.includes('La fecha de inicio no puede ser mayor que la fecha de fin')) {
+      // Clear the error if dates are corrected
+      setError('');
     }
-  }, [fechaInicio, fechaFin]);
+  }, [fechaInicio, fechaFin, error]);
 
   const fetchPacientes = async () => {
     try {
@@ -37,7 +40,7 @@ function ImprimirNotas() {
       const response = await axios.get('/api/pacientes');
       console.log('Pacientes cargados:', response.data);
       setPacientes(response.data || []);
-      
+
       // Clear any previous errors if successful
       if (error && error.includes('Error al cargar pacientes')) {
         setError('');
@@ -54,14 +57,14 @@ function ImprimirNotas() {
   const generateSampleNotes = () => {
     const sampleNotes = [];
     const baseDate = new Date();
-    
+
     // Generar 35 notas para asegurar múltiples páginas
     for (let i = 0; i < 35; i++) {
       const noteDate = new Date(baseDate);
       noteDate.setDate(baseDate.getDate() - Math.floor(i / 8)); // Diferentes días
-      
+
       const hora = String(8 + (i % 12)).padStart(2, '0') + ':' + String((i * 15) % 60).padStart(2, '0');
-      
+
       const observaciones = [
         'Paciente estable, signos vitales dentro de parámetros normales. Presión arterial 120/80, frecuencia cardíaca 72 lpm, temperatura 36.5°C.',
         'Control de glucemia realizado. Resultado: 110 mg/dl. Administración de medicamentos según protocolo establecido.',
@@ -99,7 +102,7 @@ function ImprimirNotas() {
         'Movilización articular pasiva y activa asistida. Mantiene rango de movimiento, sin contracturas.',
         'Evaluación del patrón del sueño. Paciente descansa adecuadamente durante período nocturno.'
       ];
-      
+
       sampleNotes.push({
         id: i + 1000,
         fecha: noteDate.toISOString().split('T')[0],
@@ -111,7 +114,7 @@ function ImprimirNotas() {
         tratamientos: i % 4 === 0 ? 'Fisioterapia respiratoria, movilización asistida' : ''
       });
     }
-    
+
     return sampleNotes;
   };
 
@@ -127,37 +130,46 @@ function ImprimirNotas() {
     try {
       console.log('Buscando notas para paciente:', selectedPaciente);
       const response = await axios.get(`/api/pacientes/${selectedPaciente}`);
-      
-      if (!response.data) {
-        setError('No se encontró información del paciente');
-        return;
+
+      if (!response.data || !response.data.notas) {
+        // If patient data exists but no notes array, treat as no notes found.
+        // If patient data doesn't exist at all, the previous error would have been caught.
+        setNotas([]);
+        console.log('No se encontraron notas para el paciente.');
+      } else {
+        let notasFiltradas = response.data.notas || [];
+        console.log('Notas encontradas:', notasFiltradas.length);
+
+        // Filtrar por fechas si se especifican
+        if (fechaInicio) {
+          notasFiltradas = notasFiltradas.filter(nota => nota.fecha >= fechaInicio);
+        }
+        if (fechaFin) {
+          notasFiltradas = notasFiltradas.filter(nota => nota.fecha <= fechaFin);
+        }
+
+        console.log('Notas después del filtro:', notasFiltradas.length);
+
+        // Si hay pocas notas, agregar datos de prueba para demostrar el formato
+        // THIS IS THE LINE THAT NEEDS TO BE FIXED
+        // if (notasFiltradas.length < 5) {
+        //   console.log('Agregando notas de ejemplo para demostración');
+        //   const sampleNotes = generateSampleNotes();
+        //   notasFiltradas = [...notasFiltradas, ...sampleNotes];
+        // }
+
+        setNotas(notasFiltradas);
       }
 
-      let notasFiltradas = response.data.notas || [];
-      console.log('Notas encontradas:', notasFiltradas.length);
-
-      // Filtrar por fechas si se especifican
-      if (fechaInicio) {
-        notasFiltradas = notasFiltradas.filter(nota => nota.fecha >= fechaInicio);
-      }
-      if (fechaFin) {
-        notasFiltradas = notasFiltradas.filter(nota => nota.fecha <= fechaFin);
-      }
-
-      console.log('Notas después del filtro:', notasFiltradas.length);
-
-      // Si hay pocas notas, agregar datos de prueba para demostrar el formato
-      if (notasFiltradas.length < 5) {
-        console.log('Agregando notas de ejemplo para demostración');
-        const sampleNotes = generateSampleNotes();
-        notasFiltradas = [...notasFiltradas, ...sampleNotes];
-      }
-
-      setNotas(notasFiltradas);
     } catch (error) {
       console.error('Error fetching patient notes:', error);
-      setError(`Error al cargar notas del paciente: ${error.response?.data?.error || error.message}`);
-      setNotas([]);
+      if (error.response && error.response.status === 404) {
+        setError('Paciente no encontrado');
+        setNotas([]);
+      } else {
+        setError(`Error al cargar notas del paciente: ${error.response?.data?.error || error.message}`);
+        setNotas([]);
+      }
     } finally {
       setLoading(false);
     }
@@ -170,9 +182,17 @@ function ImprimirNotas() {
     }
 
     const paciente = pacientes.find(p => p.id === parseInt(selectedPaciente));
+    if (!paciente) {
+      setError('Información del paciente no encontrada para imprimir.');
+      return;
+    }
 
     // Crear una nueva ventana para imprimir
     const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      setError('Por favor, permita las ventanas emergentes para imprimir.');
+      return;
+    }
     const printContent = generatePrintHTML(paciente, notas);
 
     printWindow.document.write(printContent);
@@ -181,6 +201,10 @@ function ImprimirNotas() {
     // Esperar a que se cargue el contenido y luego imprimir
     printWindow.onload = () => {
       printWindow.print();
+      // Close the print window after printing
+      setTimeout(() => {
+        printWindow.close();
+      }, 1000); // Give it a moment to ensure print dialog is shown
     };
   };
 
@@ -406,23 +430,23 @@ function ImprimirNotas() {
               margin-top: 20px;
             }
             @media print {
-              body { 
-                margin: 0; 
+              body {
+                margin: 0;
                 -webkit-print-color-adjust: exact;
                 print-color-adjust: exact;
               }
-              .header { 
+              .header {
                 page-break-after: avoid;
                 margin-bottom: 15px;
               }
-              .patient-info { 
+              .patient-info {
                 page-break-after: avoid;
                 margin-bottom: 15px;
               }
-              .note-item { 
-                page-break-inside: avoid; 
+              .note-item {
+                page-break-inside: avoid;
               }
-              .footer { 
+              .footer {
                 page-break-before: avoid;
                 page-break-inside: avoid;
               }
@@ -648,7 +672,7 @@ function ImprimirNotas() {
     `;
   };
 
-  
+
 
   return (
     <Container className="mt-4">
@@ -667,14 +691,22 @@ function ImprimirNotas() {
                 <Form.Label>Paciente *</Form.Label>
                 <Form.Select
                   value={selectedPaciente}
-                  onChange={(e) => setSelectedPaciente(e.target.value)}
+                  onChange={(e) => {
+                    setSelectedPaciente(e.target.value);
+                    setNotas([]); // Clear notes when patient changes
+                    setError(''); // Clear error when patient changes
+                  }}
                   required
-                  disabled={pacientes.length === 0}
+                  disabled={pacientes.length === 0 && initialLoading}
                 >
                   <option value="">
-                    {pacientes.length === 0 
-                      ? "Cargando pacientes..." 
-                      : "Seleccionar paciente..."
+                    {pacientes.length === 0 && initialLoading
+                      ? "Cargando pacientes..."
+                      : pacientes.length === 0 && !initialLoading && !error
+                        ? "No hay pacientes disponibles"
+                        : pacientes.length === 0 && error && error.includes("pacientes")
+                          ? "Error al cargar pacientes"
+                          : "Seleccionar paciente..."
                     }
                   </option>
                   {pacientes.map(paciente => (
@@ -683,7 +715,7 @@ function ImprimirNotas() {
                     </option>
                   ))}
                 </Form.Select>
-                {pacientes.length === 0 && !error && (
+                {pacientes.length === 0 && initialLoading && (
                   <Form.Text className="text-muted">
                     Cargando lista de pacientes...
                   </Form.Text>
@@ -745,17 +777,17 @@ function ImprimirNotas() {
         </Card.Body>
       </Card>
 
-      {notas.length > 0 && (
+      {notas.length > 0 ? (
         <Card>
           <Card.Header>
-            <h5>Vista Previa - {notas.length} nota(s) encontrada(s)</h5>
+            <h5>Vista Previa - {notas.length} nota(s) encontrada(s) del paciente seleccionado</h5>
           </Card.Header>
           <Card.Body>
             <div style={{ maxHeight: '400px', overflowY: 'auto' }}>
               {notas.map((nota, index) => (
                 <div key={index} className="border rounded p-3 mb-3">
                   <div className="d-flex justify-content-between align-items-center mb-2">
-                    <strong>{new Date(nota.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })} - {nota.hora.substring(0, 5)}</strong>
+                    <strong>{nota.fechaFormateada || (nota.fecha ? new Date(nota.fecha).toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' }) : 'N/A')} - {nota.horaFormateada || (nota.hora ? nota.hora.substring(0, 5) : 'N/A')}</strong>
                     <small className="text-muted">
                       {nota.enfermero_nombre} {nota.enfermero_apellidos}
                     </small>
@@ -779,6 +811,21 @@ function ImprimirNotas() {
                 </div>
               ))}
             </div>
+          </Card.Body>
+        </Card>
+      ) : selectedPaciente && !loading && (
+        <Card>
+          <Card.Header>
+            <h5>Sin notas encontradas</h5>
+          </Card.Header>
+          <Card.Body>
+            <Alert variant="info">
+              No se encontraron notas para el paciente seleccionado en el período especificado.
+              <br />
+              <small>
+                <strong>Período:</strong> {fechaInicio || 'Sin fecha inicio'} al {fechaFin || 'Sin fecha fin'}
+              </small>
+            </Alert>
           </Card.Body>
         </Card>
       )}
