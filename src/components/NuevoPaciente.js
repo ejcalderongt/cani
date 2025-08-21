@@ -27,7 +27,7 @@ function NuevoPaciente() {
     informacion_general: '',
     tipo_paciente: 'ambulatorio',
     cuarto_asignado: '',
-    fecha_ingreso: '',
+    fecha_ingreso: new Date().toISOString().slice(0, 16), // Default to current date and time
     motivo_ingreso: '',
     fase_tratamiento: '',
     unidad_cama: '',
@@ -46,8 +46,7 @@ function NuevoPaciente() {
     const year = date.getFullYear().toString().slice(-2);
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
-    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
-    return `${year}${month}${day}${random}`;
+    return `EXP${day}${month}${year}`;
   };
 
   const handleChange = (e) => {
@@ -122,9 +121,9 @@ function NuevoPaciente() {
         estatura: '',
         padecimientos: '',
         informacion_general: '',
-        tipo_paciente: '',
+        tipo_paciente: 'ambulatorio',
         cuarto_asignado: '',
-        fecha_ingreso: '',
+        fecha_ingreso: new Date().toISOString().slice(0, 16), // Reset to current date and time
         motivo_ingreso: '',
         fase_tratamiento: '',
         unidad_cama: '',
@@ -395,13 +394,18 @@ function NuevoPaciente() {
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Fecha/Hora de Ingreso</Form.Label>
+                  <Form.Label>Fecha/Hora de Ingreso <span style={{color: 'red'}}>*</span></Form.Label>
                   <Form.Control
                     type="datetime-local"
                     name="fecha_ingreso"
                     value={formData.fecha_ingreso}
                     onChange={handleChange}
+                    required
+                    style={{borderColor: !formData.fecha_ingreso && error ? 'red' : ''}}
                   />
+                  <Form.Text className="text-muted">
+                    Por defecto se establece la fecha y hora actual
+                  </Form.Text>
                 </Form.Group>
               </Col>
               <Col md={6}>
