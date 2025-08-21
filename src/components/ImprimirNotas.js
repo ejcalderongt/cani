@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Container, Card, Button, Form, Alert, Table } from 'react-bootstrap';
+import { Container, Card, Button, Form, Alert, Table, Spinner } from 'react-bootstrap';
 import axios from 'axios';
 
 function ImprimirNotas() {
@@ -7,6 +7,7 @@ function ImprimirNotas() {
   const [selectedPaciente, setSelectedPaciente] = useState('');
   const [notas, setNotas] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [initialLoading, setInitialLoading] = useState(true);
   const [error, setError] = useState('');
 
   // Set default dates: yesterday to today
@@ -19,15 +20,34 @@ function ImprimirNotas() {
   const [formatoImpresion] = useState('con-lineas'); // Only official format
 
   useEffect(() => {
+    console.log('Componente ImprimirNotas montado, cargando pacientes...');
     fetchPacientes();
   }, []);
 
+  // Validate dates
+  useEffect(() => {
+    if (fechaInicio && fechaFin && fechaInicio > fechaFin) {
+      setError('La fecha de inicio no puede ser mayor que la fecha de fin');
+    }
+  }, [fechaInicio, fechaFin]);
+
   const fetchPacientes = async () => {
     try {
+      setInitialLoading(true);
       const response = await axios.get('/api/pacientes');
-      setPacientes(response.data);
+      console.log('Pacientes cargados:', response.data);
+      setPacientes(response.data || []);
+      
+      // Clear any previous errors if successful
+      if (error && error.includes('Error al cargar pacientes')) {
+        setError('');
+      }
     } catch (error) {
-      setError('Error al cargar pacientes');
+      console.error('Error fetching pacientes:', error);
+      setError(`Error al cargar pacientes: ${error.response?.data?.error || error.message}`);
+      setPacientes([]);
+    } finally {
+      setInitialLoading(false);
     }
   };
 
@@ -96,14 +116,25 @@ function ImprimirNotas() {
   };
 
   const fetchNotasPaciente = async () => {
-    if (!selectedPaciente) return;
+    if (!selectedPaciente) {
+      setError('Por favor seleccione un paciente');
+      return;
+    }
 
     setLoading(true);
     setError('');
 
     try {
+      console.log('Buscando notas para paciente:', selectedPaciente);
       const response = await axios.get(`/api/pacientes/${selectedPaciente}`);
-      let notasFiltradas = response.data.notas;
+      
+      if (!response.data) {
+        setError('No se encontró información del paciente');
+        return;
+      }
+
+      let notasFiltradas = response.data.notas || [];
+      console.log('Notas encontradas:', notasFiltradas.length);
 
       // Filtrar por fechas si se especifican
       if (fechaInicio) {
@@ -113,15 +144,20 @@ function ImprimirNotas() {
         notasFiltradas = notasFiltradas.filter(nota => nota.fecha <= fechaFin);
       }
 
+      console.log('Notas después del filtro:', notasFiltradas.length);
+
       // Si hay pocas notas, agregar datos de prueba para demostrar el formato
       if (notasFiltradas.length < 5) {
+        console.log('Agregando notas de ejemplo para demostración');
         const sampleNotes = generateSampleNotes();
         notasFiltradas = [...notasFiltradas, ...sampleNotes];
       }
 
       setNotas(notasFiltradas);
     } catch (error) {
-      setError('Error al cargar notas del paciente');
+      console.error('Error fetching patient notes:', error);
+      setError(`Error al cargar notas del paciente: ${error.response?.data?.error || error.message}`);
+      setNotas([]);
     } finally {
       setLoading(false);
     }
@@ -633,14 +669,30 @@ function ImprimirNotas() {
                   value={selectedPaciente}
                   onChange={(e) => setSelectedPaciente(e.target.value)}
                   required
+                  disabled={pacientes.length === 0}
                 >
-                  <option value="">Seleccionar paciente...</option>
+                  <option value="">
+                    {pacientes.length === 0 
+                      ? "Cargando pacientes..." 
+                      : "Seleccionar paciente..."
+                    }
+                  </option>
                   {pacientes.map(paciente => (
                     <option key={paciente.id} value={paciente.id}>
                       {paciente.numero_expediente} - {paciente.nombre} {paciente.apellidos}
                     </option>
                   ))}
                 </Form.Select>
+                {pacientes.length === 0 && !error && (
+                  <Form.Text className="text-muted">
+                    Cargando lista de pacientes...
+                  </Form.Text>
+                )}
+                {pacientes.length > 0 && (
+                  <Form.Text className="text-muted">
+                    {pacientes.length} paciente(s) disponible(s)
+                  </Form.Text>
+                )}
               </Form.Group>
             </div>
           </div>
