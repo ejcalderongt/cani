@@ -7,6 +7,7 @@ function NuevoPaciente() {
   const navigate = useNavigate();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
   const [formData, setFormData] = useState({
     numero_expediente: '',
     nombre: '',
@@ -72,7 +73,8 @@ function NuevoPaciente() {
     // Validación básica de campos obligatorios
     if (!formData.numero_expediente?.trim() || !formData.nombre?.trim() || !formData.apellidos?.trim() ||
         !formData.fecha_nacimiento || !formData.sexo || !formData.documento_identidad?.trim() ||
-        !formData.nacionalidad?.trim() || !formData.tipo_paciente || !formData.fecha_ingreso) {
+        !formData.nacionalidad?.trim() || !formData.tipo_paciente || !formData.fecha_ingreso ||
+        !formData.telefono_principal?.trim()) {
       setError('Por favor, completa todos los campos obligatorios marcados con *');
       setLoading(false);
       return;
@@ -155,6 +157,7 @@ function NuevoPaciente() {
       <h1 className="mb-4">Nuevo Paciente - Clínica de Tratamiento de Adicciones</h1>
 
       {error && <Alert variant="danger">{error}</Alert>}
+      {success && <Alert variant="success">{success}</Alert>}
 
       <Card>
         <Card.Body>

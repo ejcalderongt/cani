@@ -744,9 +744,10 @@ app.post('/api/pacientes', requireAuth, async (req, res) => {
 
     // Validar campos requeridos (verificar que no sean null, undefined o strings vacíos)
     if (!numero_expediente?.trim() || !nombre?.trim() || !apellidos?.trim() || !fecha_nacimiento ||
-        !documento_identidad?.trim() || !nacionalidad?.trim() || !tipo_paciente || !sexo || !fecha_ingreso) {
+        !documento_identidad?.trim() || !nacionalidad?.trim() || !tipo_paciente || !sexo || !fecha_ingreso ||
+        !telefono_principal?.trim()) {
       return res.status(400).json({
-        error: 'Faltan campos obligatorios: número de expediente, nombre, apellidos, fecha de nacimiento, documento de identidad, nacionalidad, tipo de paciente, sexo y fecha de ingreso son requeridos'
+        error: 'Faltan campos obligatorios: número de expediente, nombre, apellidos, fecha de nacimiento, documento de identidad, nacionalidad, tipo de paciente, sexo, fecha de ingreso y teléfono principal son requeridos'
       });
     }
 
@@ -763,8 +764,8 @@ app.post('/api/pacientes', requireAuth, async (req, res) => {
       telefono_principal || '',
       telefono_secundario || '',
       tipo_sangre || '',
-      peso || '', // Keep as empty string if null/undefined for DB to handle potential nulls
-      estatura || '', // Keep as empty string if null/undefined for DB to handle potential nulls
+      peso || null, // Allow null for numeric fields
+      estatura || null, // Allow null for numeric fields
       padecimientos || '',
       informacion_general || '',
       tipo_paciente,
