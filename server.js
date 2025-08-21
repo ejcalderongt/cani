@@ -427,14 +427,16 @@ async function initDatabase() {
     }
 
     // Insert default users if they don't exist
-    const existingUsers = await pool.query('SELECT codigo FROM enfermeros WHERE codigo IN ($1, $2, $3, $4)', ['admin', 'erick', 'cintia', 'ENF001']);
+    const existingUsers = await pool.query('SELECT codigo FROM enfermeros WHERE codigo IN ($1, $2, $3, $4, $5, $6)', ['admin', 'erick', 'cintia', 'mynor', 'nohemi', 'ENF001']);
     const existingCodes = existingUsers.rows.map(row => row.codigo);
 
     const defaultUsers = [
       {codigo: 'admin', clave: 'admin123', nombre: 'Admin', apellidos: 'Sistema', turno: 'todos', debe_cambiar_clave: false, primer_login: false, rol: 'admin', can_manage_billing: true },
-      {codigo: 'erick', clave: 'abc123', nombre: 'Erick', apellidos: 'Usuario', turno: 'mañana', debe_cambiar_clave: true, primer_login: true, rol: 'enfermero', can_manage_billing: false },
-      {codigo: 'cintia', clave: 'abc123', nombre: 'Cintia', apellidos: 'Usuario', turno: 'tarde', debe_cambiar_clave: true, primer_login: true, rol: 'enfermero', can_manage_billing: false },
-      {codigo: 'ENF001', clave: 'abc123', nombre: 'Enfermero', apellidos: 'De Prueba', turno: 'mañana', debe_cambiar_clave: true, primer_login: true, rol: 'enfermero', can_manage_billing: false }
+      {codigo: 'erick', clave: 'abc123', nombre: 'Erick', apellidos: 'Enfermero', turno: 'mañana', debe_cambiar_clave: true, primer_login: true, rol: 'enfermero', can_manage_billing: false },
+      {codigo: 'cintia', clave: 'abc123', nombre: 'Cintia', apellidos: 'Enfermera', turno: 'tarde', debe_cambiar_clave: true, primer_login: true, rol: 'enfermero', can_manage_billing: false },
+      {codigo: 'mynor', clave: 'abc123', nombre: 'Mynor', apellidos: 'Enfermero', turno: 'mañana', debe_cambiar_clave: true, primer_login: true, rol: 'enfermero', can_manage_billing: false },
+      {codigo: 'nohemi', clave: 'abc123', nombre: 'Nohemi', apellidos: 'Enfermera', turno: 'tarde', debe_cambiar_clave: true, primer_login: true, rol: 'enfermero', can_manage_billing: false },
+      {codigo: 'ENF001', clave: 'abc123', nombre: 'Enfermero', apellidos: 'General', turno: 'mañana', debe_cambiar_clave: true, primer_login: true, rol: 'enfermero', can_manage_billing: false }
     ];
 
     for (const user of defaultUsers) {
@@ -484,7 +486,7 @@ const requireAuth = (req, res, next) => {
 
   if (!req.session || !req.session.enfermero_id) {
     console.log('Authentication failed - no valid session or enfermero_id');
-    return res.status(401).json({ 
+    return res.status(401).json({
       error: 'No autenticado',
       debug: {
         hasSession: !!req.session,
@@ -506,7 +508,7 @@ const requireAdmin = async (req, res, next) => {
     if (result.rows.length === 0) {
       return res.status(404).json({ error: 'Usuario no encontrado' });
     }
-    
+
     if (result.rows[0].rol !== 'admin') {
       return res.status(403).json({ error: 'Acceso denegado. Solo administradores.' });
     }
