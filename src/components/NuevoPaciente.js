@@ -39,17 +39,56 @@ function NuevoPaciente() {
     riesgo_caidas: false
   });
 
+  // Generate expedition number suggestion based on birth date
+  const generateExpeditionNumber = (birthDate) => {
+    if (!birthDate) return '';
+    const date = new Date(birthDate);
+    const year = date.getFullYear().toString().slice(-2);
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const random = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    return `${year}${month}${day}${random}`;
+  };
+
   const handleChange = (e) => {
-    setFormData({
+    const newFormData = {
       ...formData,
       [e.target.name]: e.target.value
-    });
+    };
+
+    // Auto-suggest expedition number when birth date changes
+    if (e.target.name === 'fecha_nacimiento' && e.target.value) {
+      newFormData.numero_expediente = generateExpeditionNumber(e.target.value);
+    }
+
+    setFormData(newFormData);
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setLoading(true);
     setError('');
+
+    // Validate required fields
+    const requiredFields = [
+      { field: 'numero_expediente', name: 'Número de Expediente' },
+      { field: 'nombre', name: 'Nombre' },
+      { field: 'apellidos', name: 'Apellidos' },
+      { field: 'fecha_nacimiento', name: 'Fecha de Nacimiento' },
+      { field: 'sexo', name: 'Sexo' },
+      { field: 'documento_identidad', name: 'Documento de Identidad' },
+      { field: 'nacionalidad', name: 'Nacionalidad' },
+      { field: 'telefono_principal', name: 'Teléfono Principal' },
+      { field: 'tipo_paciente', name: 'Tipo de Paciente' }
+    ];
+
+    const missingFields = requiredFields.filter(({ field }) => !formData[field]?.trim());
+    
+    if (missingFields.length > 0) {
+      setError(`Los siguientes campos son obligatorios: ${missingFields.map(({ name }) => name).join(', ')}`);
+      setLoading(false);
+      return;
+    }
 
     try {
       // Set fecha_ingreso to current datetime if not provided
@@ -87,6 +126,9 @@ function NuevoPaciente() {
                     onChange={handleChange}
                     required
                   />
+                  <Form.Text className="text-muted">
+                    Se sugiere automáticamente al ingresar la fecha de nacimiento
+                  </Form.Text>
                 </Form.Group>
               </Col>
               <Col md={6}>
@@ -189,12 +231,11 @@ function NuevoPaciente() {
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Tipo de Sangre</Form.Label>
+                  <Form.Label>Tipo de Sangre (Opcional)</Form.Label>
                   <Form.Select
                     name="tipo_sangre"
                     value={formData.tipo_sangre}
                     onChange={handleChange}
-                    required
                   >
                     <option value="">Seleccionar...</option>
                     <option value="A+">A+</option>
@@ -290,7 +331,7 @@ function NuevoPaciente() {
               </Col>
             </Row>
 
-            <h5 className="text-primary mb-3 mt-4">Información del Episodio</h5>
+            <h5 className="text-primary mb-3 mt-4">Información del Episodio <small className="text-muted">(Opcional)</small></h5>
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
@@ -305,12 +346,11 @@ function NuevoPaciente() {
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Motivo de Ingreso</Form.Label>
+                  <Form.Label>Motivo de Ingreso (Opcional)</Form.Label>
                   <Form.Select
                     name="motivo_ingreso"
                     value={formData.motivo_ingreso}
                     onChange={handleChange}
-                    required
                   >
                     <option value="">Seleccionar...</option>
                     <option value="desintoxicacion">Desintoxicación</option>
@@ -324,12 +364,11 @@ function NuevoPaciente() {
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Fase de Tratamiento</Form.Label>
+                  <Form.Label>Fase de Tratamiento (Opcional)</Form.Label>
                   <Form.Select
                     name="fase_tratamiento"
                     value={formData.fase_tratamiento}
                     onChange={handleChange}
-                    required
                   >
                     <option value="">Seleccionar...</option>
                     <option value="intoxicacion_aguda">Intoxicación Aguda</option>
