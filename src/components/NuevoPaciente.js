@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Container, Card, Form, Button, Row, Col, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
@@ -50,17 +51,43 @@ function NuevoPaciente() {
   };
 
   const handleChange = (e) => {
+    const { name, value, type, checked } = e.target;
+    let newValue = type === 'checkbox' ? checked : value;
+
     const newFormData = {
       ...formData,
-      [e.target.name]: e.target.value
+      [name]: newValue
     };
 
     // Auto-suggest expedition number when birth date changes
-    if (e.target.name === 'fecha_nacimiento' && e.target.value) {
-      newFormData.numero_expediente = generateExpeditionNumber(e.target.value);
+    if (name === 'fecha_nacimiento' && value) {
+      newFormData.numero_expediente = generateExpeditionNumber(value);
     }
 
     setFormData(newFormData);
+  };
+
+  const validateRequiredFields = () => {
+    const requiredFields = [
+      'numero_expediente',
+      'nombre', 
+      'apellidos',
+      'fecha_nacimiento',
+      'sexo',
+      'documento_identidad',
+      'nacionalidad',
+      'tipo_paciente',
+      'fecha_ingreso',
+      'telefono_principal'
+    ];
+
+    for (let field of requiredFields) {
+      const value = formData[field];
+      if (!value || (typeof value === 'string' && value.trim() === '')) {
+        return false;
+      }
+    }
+    return true;
   };
 
   const handleSubmit = async (e) => {
@@ -70,33 +97,42 @@ function NuevoPaciente() {
     setSuccess('');
 
     // Validación básica de campos obligatorios
-    if (!formData.numero_expediente?.trim() || !formData.nombre?.trim() || !formData.apellidos?.trim() ||
-        !formData.fecha_nacimiento || !formData.sexo || !formData.documento_identidad?.trim() ||
-        !formData.nacionalidad?.trim() || !formData.tipo_paciente || !formData.fecha_ingreso ||
-        !formData.telefono_principal?.trim()) {
+    if (!validateRequiredFields()) {
       setError('Por favor, completa todos los campos obligatorios marcados con *');
       setLoading(false);
       return;
     }
 
-    // Preparar datos para envío, asegurando que campos opcionales sean strings vacíos
+    // Preparar datos para envío, convirtiendo valores vacíos y nulos apropiadamente
     const dataToSend = {
-      ...formData,
-      contacto_emergencia_nombre: formData.contacto_emergencia_nombre || '',
-      contacto_emergencia_telefono: formData.contacto_emergencia_telefono || '',
-      telefono_principal: formData.telefono_principal || '',
-      telefono_secundario: formData.telefono_secundario || '',
-      tipo_sangre: formData.tipo_sangre || '',
-      peso: formData.peso || '',
-      estatura: formData.estatura || '',
-      padecimientos: formData.padecimientos || '',
-      informacion_general: formData.informacion_general || '',
-      cuarto_asignado: formData.cuarto_asignado || '',
-      motivo_ingreso: formData.motivo_ingreso || '',
-      fase_tratamiento: formData.fase_tratamiento || '',
-      unidad_cama: formData.unidad_cama || '',
-      medico_tratante: formData.medico_tratante || '',
-      equipo_tratante: formData.equipo_tratante || ''
+      numero_expediente: formData.numero_expediente.trim(),
+      nombre: formData.nombre.trim(),
+      apellidos: formData.apellidos.trim(),
+      fecha_nacimiento: formData.fecha_nacimiento,
+      sexo: formData.sexo.toLowerCase(), // Ensure lowercase for database consistency
+      documento_identidad: formData.documento_identidad.trim(),
+      nacionalidad: formData.nacionalidad.trim(),
+      contacto_emergencia_nombre: formData.contacto_emergencia_nombre.trim() || null,
+      contacto_emergencia_telefono: formData.contacto_emergencia_telefono.trim() || null,
+      telefono_principal: formData.telefono_principal.trim(),
+      telefono_secundario: formData.telefono_secundario.trim() || null,
+      tipo_sangre: formData.tipo_sangre || null,
+      peso: formData.peso ? parseFloat(formData.peso) : null,
+      estatura: formData.estatura ? parseFloat(formData.estatura) : null,
+      padecimientos: formData.padecimientos.trim() || null,
+      informacion_general: formData.informacion_general.trim() || null,
+      tipo_paciente: formData.tipo_paciente,
+      cuarto_asignado: formData.cuarto_asignado.trim() || null,
+      fecha_ingreso: formData.fecha_ingreso,
+      motivo_ingreso: formData.motivo_ingreso || null,
+      fase_tratamiento: formData.fase_tratamiento || null,
+      unidad_cama: formData.unidad_cama.trim() || null,
+      medico_tratante: formData.medico_tratante.trim() || null,
+      equipo_tratante: formData.equipo_tratante.trim() || null,
+      riesgo_suicidio: Boolean(formData.riesgo_suicidio),
+      riesgo_violencia: Boolean(formData.riesgo_violencia),
+      riesgo_fuga: Boolean(formData.riesgo_fuga),
+      riesgo_caidas: Boolean(formData.riesgo_caidas)
     };
 
     try {
@@ -141,8 +177,16 @@ function NuevoPaciente() {
       }, 2000);
     } catch (error) {
       console.error('Error creating patient:', error);
-      if (error.response && error.response.status === 400) {
-        setError('Error de validación: ' + (error.response.data.error || 'Datos inválidos'));
+      if (error.response) {
+        if (error.response.status === 400) {
+          setError('Error de validación: ' + (error.response.data.error || 'Datos inválidos'));
+        } else if (error.response.status === 500) {
+          setError('Error interno del servidor. Por favor, intenta nuevamente.');
+        } else {
+          setError('Error al registrar el paciente: ' + (error.response.data.error || 'Error desconocido'));
+        }
+      } else if (error.request) {
+        setError('Error de conexión. Verifica tu conexión a internet.');
       } else {
         setError('Error al registrar el paciente');
       }
@@ -194,6 +238,7 @@ function NuevoPaciente() {
                   >
                     <option value="ambulatorio">Ambulatorio</option>
                     <option value="interno">Interno</option>
+                    <option value="externo">Externo</option>
                   </Form.Select>
                 </Form.Group>
               </Col>
@@ -316,6 +361,8 @@ function NuevoPaciente() {
                   <Form.Control
                     type="number"
                     step="0.01"
+                    min="0"
+                    max="500"
                     name="peso"
                     value={formData.peso}
                     onChange={handleChange}
@@ -329,6 +376,8 @@ function NuevoPaciente() {
                   <Form.Control
                     type="number"
                     step="0.01"
+                    min="0"
+                    max="3"
                     name="estatura"
                     value={formData.estatura}
                     onChange={handleChange}
@@ -420,6 +469,8 @@ function NuevoPaciente() {
                     <option value="desintoxicacion">Desintoxicación</option>
                     <option value="recaida">Recaída</option>
                     <option value="mantenimiento">Mantenimiento</option>
+                    <option value="consulta_externa">Consulta Externa</option>
+                    <option value="crisis_psiquiatrica">Crisis Psiquiátrica</option>
                   </Form.Select>
                 </Form.Group>
               </Col>
@@ -439,6 +490,9 @@ function NuevoPaciente() {
                     <option value="abstinencia">Abstinencia</option>
                     <option value="estabilizacion">Estabilización</option>
                     <option value="mantenimiento">Mantenimiento</option>
+                    <option value="fase_1">Fase 1</option>
+                    <option value="fase_2">Fase 2</option>
+                    <option value="seguimiento">Seguimiento</option>
                   </Form.Select>
                 </Form.Group>
               </Col>
@@ -491,7 +545,7 @@ function NuevoPaciente() {
                   label="Riesgo de Suicidio/Autoagresión"
                   name="riesgo_suicidio"
                   checked={formData.riesgo_suicidio}
-                  onChange={(e) => setFormData({...formData, riesgo_suicidio: e.target.checked})}
+                  onChange={handleChange}
                 />
               </Col>
               <Col md={3}>
@@ -500,7 +554,7 @@ function NuevoPaciente() {
                   label="Riesgo de Violencia"
                   name="riesgo_violencia"
                   checked={formData.riesgo_violencia}
-                  onChange={(e) => setFormData({...formData, riesgo_violencia: e.target.checked})}
+                  onChange={handleChange}
                 />
               </Col>
               <Col md={3}>
@@ -509,7 +563,7 @@ function NuevoPaciente() {
                   label="Riesgo de Fuga"
                   name="riesgo_fuga"
                   checked={formData.riesgo_fuga}
-                  onChange={(e) => setFormData({...formData, riesgo_fuga: e.target.checked})}
+                  onChange={handleChange}
                 />
               </Col>
               <Col md={3}>
@@ -518,7 +572,7 @@ function NuevoPaciente() {
                   label="Riesgo de Caídas"
                   name="riesgo_caidas"
                   checked={formData.riesgo_caidas}
-                  onChange={(e) => setFormData({...formData, riesgo_caidas: e.target.checked})}
+                  onChange={handleChange}
                 />
               </Col>
             </Row>
