@@ -1,37 +1,125 @@
 
 import React, { useState, useEffect } from 'react';
-import { Container, Card, Button, Table, Modal, ProgressBar, Alert } from 'react-bootstrap';
+import { Container, Card, Button, Table, Modal, ProgressBar, Alert, Form, Row, Col } from 'react-bootstrap';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
 
 function NotasEnfermeria() {
   const [notas, setNotas] = useState([]);
+  const [notasFiltradas, setNotasFiltradas] = useState([]);
+  const [pacientes, setPacientes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [selectedNota, setSelectedNota] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [estadoLlenado, setEstadoLlenado] = useState({});
 
+  // Filtros
+  const [filtros, setFiltros] = useState({
+    paciente_id: '',
+    fecha_inicio: getFirstDayOfCurrentMonth(),
+    fecha_fin: getLastDayOfCurrentMonth()
+  });
+
   // Configuración para hoja legal estándar
   const CARACTERES_POR_HOJA = 2000;
 
-  useEffect(() => {
-    const fetchNotas = async () => {
-      try {
-        const response = await axios.get('/api/notas');
-        const notasData = response.data;
-        setNotas(notasData);
-        
-        // Calcular estado de llenado por paciente para el día actual
-        calcularEstadoLlenado(notasData);
-      } catch (error) {
-        console.error('Error al cargar notas:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  // Función para obtener el primer día del mes actual
+  function getFirstDayOfCurrentMonth() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth(), 1).toISOString().split('T')[0];
+  }
 
-    fetchNotas();
+  // Función para obtener el último día del mes actual
+  function getLastDayOfCurrentMonth() {
+    const now = new Date();
+    return new Date(now.getFullYear(), now.getMonth() + 1, 0).toISOString().split('T')[0];
+  }
+
+  useEffect(() => {
+    const fetchData = async () => {
+      await Promise.all([fetchNotas(), fetchPacientes()]);
+    };
+    fetchData();
   }, []);
+
+  useEffect(() => {
+    aplicarFiltros();
+  }, [notas, filtros]);
+
+  const fetchNotas = async () => {
+    try {
+      const response = await axios.get('/api/notas');
+      const notasData = response.data;
+      setNotas(notasData);
+      
+      // Calcular estado de llenado por paciente para el día actual
+      calcularEstadoLlenado(notasData);
+    } catch (error) {
+      console.error('Error al cargar notas:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchPacientes = async () => {
+    try {
+      const response = await axios.get('/api/pacientes');
+      setPacientes(response.data);
+    } catch (error) {
+      console.error('Error al cargar pacientes:', error);
+    }
+  };
+
+  const aplicarFiltros = () => {
+    let notasFiltradasTemp = [...notas];
+
+    // Filtrar por paciente
+    if (filtros.paciente_id) {
+      notasFiltradasTemp = notasFiltradasTemp.filter(nota => 
+        nota.paciente_id.toString() === filtros.paciente_id.toString()
+      );
+    }
+
+    // Filtrar por rango de fechas
+    if (filtros.fecha_inicio) {
+      notasFiltradasTemp = notasFiltradasTemp.filter(nota => 
+        nota.fecha >= filtros.fecha_inicio
+      );
+    }
+
+    if (filtros.fecha_fin) {
+      notasFiltradasTemp = notasFiltradasTemp.filter(nota => 
+        nota.fecha <= filtros.fecha_fin
+      );
+    }
+
+    // Ordenar por fecha y hora (más recientes primero)
+    notasFiltradasTemp.sort((a, b) => {
+      const fechaHoraA = new Date(a.fecha + 'T' + a.hora);
+      const fechaHoraB = new Date(b.fecha + 'T' + b.hora);
+      return fechaHoraB - fechaHoraA;
+    });
+
+    setNotasFiltradas(notasFiltradasTemp);
+    
+    // Recalcular estado de llenado con notas filtradas
+    calcularEstadoLlenado(notasFiltradasTemp);
+  };
+
+  const handleFiltroChange = (campo, valor) => {
+    setFiltros(prev => ({
+      ...prev,
+      [campo]: valor
+    }));
+  };
+
+  const limpiarFiltros = () => {
+    setFiltros({
+      paciente_id: '',
+      fecha_inicio: getFirstDayOfCurrentMonth(),
+      fecha_fin: getLastDayOfCurrentMonth()
+    });
+  };
 
   const calcularEstadoLlenado = (notasData) => {
     const hoy = new Date().toISOString().split('T')[0];
@@ -71,7 +159,23 @@ function NotasEnfermeria() {
 
   const formatDateTime = (fecha, hora) => {
     try {
-      const fechaObj = new Date(fecha + 'T' + hora);
+      // Asegurar que la fecha esté en formato correcto
+      let fechaToProcess = fecha;
+      if (fechaToProcess && fechaToProcess.includes('T')) {
+        fechaToProcess = fechaToProcess.split('T')[0];
+      }
+      
+      if (!fechaToProcess || !hora) {
+        return 'Fecha/Hora inválida';
+      }
+
+      const fechaObj = new Date(fechaToProcess + 'T' + hora);
+      
+      // Verificar que la fecha sea válida
+      if (isNaN(fechaObj.getTime())) {
+        return `${fechaToProcess} ${hora}`;
+      }
+
       return fechaObj.toLocaleString('es-ES', {
         day: '2-digit',
         month: '2-digit',
@@ -114,6 +218,66 @@ function NotasEnfermeria() {
           Nueva Nota
         </Button>
       </div>
+
+      {/* Filtros */}
+      <Card className="mb-4">
+        <Card.Header>
+          <h5 className="mb-0">Filtros de Búsqueda</h5>
+        </Card.Header>
+        <Card.Body>
+          <Row>
+            <Col md={4}>
+              <Form.Group className="mb-3">
+                <Form.Label>Paciente</Form.Label>
+                <Form.Select
+                  value={filtros.paciente_id}
+                  onChange={(e) => handleFiltroChange('paciente_id', e.target.value)}
+                >
+                  <option value="">Todos los pacientes</option>
+                  {pacientes.map((paciente) => (
+                    <option key={paciente.id} value={paciente.id}>
+                      {paciente.numero_expediente} - {paciente.nombre} {paciente.apellidos}
+                    </option>
+                  ))}
+                </Form.Select>
+              </Form.Group>
+            </Col>
+            <Col md={3}>
+              <Form.Group className="mb-3">
+                <Form.Label>Fecha Inicio</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={filtros.fecha_inicio}
+                  onChange={(e) => handleFiltroChange('fecha_inicio', e.target.value)}
+                />
+              </Form.Group>
+            </Col>
+            <Col md={3}>
+              <Form.Group className="mb-3">
+                <Form.Label>Fecha Fin</Form.Label>
+                <Form.Control
+                  type="date"
+                  value={filtros.fecha_fin}
+                  onChange={(e) => handleFiltroChange('fecha_fin', e.target.value)}
+                />
+              </Form.Group>
+            </Col>
+            <Col md={2} className="d-flex align-items-end">
+              <Button
+                variant="outline-secondary"
+                onClick={limpiarFiltros}
+                className="mb-3"
+                size="sm"
+              >
+                Limpiar
+              </Button>
+            </Col>
+          </Row>
+          <div className="text-muted small">
+            Mostrando {notasFiltradas.length} de {notas.length} notas
+          </div>
+        </Card.Body>
+      </Card>
 
       {/* Mostrar estado de llenado del día actual */}
       {Object.keys(estadoLlenado).length > 0 && (
@@ -163,8 +327,10 @@ function NotasEnfermeria() {
 
       <Card>
         <Card.Body>
-          {notas.length === 0 ? (
-            <p className="text-muted">No hay notas registradas</p>
+          {notasFiltradas.length === 0 ? (
+            <Alert variant="info">
+              No se encontraron notas que coincidan con los filtros aplicados.
+            </Alert>
           ) : (
             <Table responsive hover>
               <thead>
@@ -177,14 +343,16 @@ function NotasEnfermeria() {
                 </tr>
               </thead>
               <tbody>
-                {notas.map((nota) => (
+                {notasFiltradas.map((nota) => (
                   <tr 
                     key={nota.id} 
                     onClick={() => handleRowClick(nota)}
                     style={{ cursor: 'pointer' }}
                     className="table-row-hover"
                   >
-                    <td>{formatDateTime(nota.fecha, nota.hora)}</td>
+                    <td>
+                      <strong>{formatDateTime(nota.fecha, nota.hora)}</strong>
+                    </td>
                     <td>
                       <strong>{nota.paciente_nombre} {nota.paciente_apellidos}</strong>
                       <br />
@@ -192,7 +360,7 @@ function NotasEnfermeria() {
                     </td>
                     <td>{nota.enfermero_nombre} {nota.enfermero_apellidos}</td>
                     <td>
-                      {nota.observaciones.length > 80 
+                      {nota.observaciones && nota.observaciones.length > 80 
                         ? `${nota.observaciones.substring(0, 80)}...` 
                         : nota.observaciones
                       }
