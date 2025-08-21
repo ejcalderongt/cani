@@ -168,17 +168,21 @@ function NuevoPaciente() {
       <Card>
         <Card.Body>
           <Form onSubmit={handleSubmit}>
-            <h5 className="text-primary mb-3">Datos Básicos</h5>
+            <h5 className="text-primary mb-3">
+              Datos Básicos 
+              <small className="text-muted"> - Los campos marcados con <span style={{color: 'red'}}>*</span> son obligatorios</small>
+            </h5>
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Número de Expediente</Form.Label>
+                  <Form.Label>Número de Expediente <span style={{color: 'red'}}>*</span></Form.Label>
                   <Form.Control
                     type="text"
                     name="numero_expediente"
                     value={formData.numero_expediente}
                     onChange={handleChange}
                     required
+                    style={{borderColor: !formData.numero_expediente && error ? 'red' : ''}}
                   />
                   <Form.Text className="text-muted">
                     Se sugiere automáticamente al ingresar la fecha de nacimiento
@@ -187,12 +191,13 @@ function NuevoPaciente() {
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Tipo de Paciente</Form.Label>
+                  <Form.Label>Tipo de Paciente <span style={{color: 'red'}}>*</span></Form.Label>
                   <Form.Select
                     name="tipo_paciente"
                     value={formData.tipo_paciente}
                     onChange={handleChange}
                     required
+                    style={{borderColor: !formData.tipo_paciente && error ? 'red' : ''}}
                   >
                     <option value="ambulatorio">Ambulatorio</option>
                     <option value="interno">Interno</option>
@@ -204,25 +209,27 @@ function NuevoPaciente() {
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Nombre</Form.Label>
+                  <Form.Label>Nombre <span style={{color: 'red'}}>*</span></Form.Label>
                   <Form.Control
                     type="text"
                     name="nombre"
                     value={formData.nombre}
                     onChange={handleChange}
                     required
+                    style={{borderColor: !formData.nombre && error ? 'red' : ''}}
                   />
                 </Form.Group>
               </Col>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Apellidos</Form.Label>
+                  <Form.Label>Apellidos <span style={{color: 'red'}}>*</span></Form.Label>
                   <Form.Control
                     type="text"
                     name="apellidos"
                     value={formData.apellidos}
                     onChange={handleChange}
                     required
+                    style={{borderColor: !formData.apellidos && error ? 'red' : ''}}
                   />
                 </Form.Group>
               </Col>
@@ -231,24 +238,26 @@ function NuevoPaciente() {
             <Row>
               <Col md={4}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Fecha de Nacimiento</Form.Label>
+                  <Form.Label>Fecha de Nacimiento <span style={{color: 'red'}}>*</span></Form.Label>
                   <Form.Control
                     type="date"
                     name="fecha_nacimiento"
                     value={formData.fecha_nacimiento}
                     onChange={handleChange}
                     required
+                    style={{borderColor: !formData.fecha_nacimiento && error ? 'red' : ''}}
                   />
                 </Form.Group>
               </Col>
               <Col md={4}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Sexo al Nacer</Form.Label>
+                  <Form.Label>Sexo al Nacer <span style={{color: 'red'}}>*</span></Form.Label>
                   <Form.Select
                     name="sexo"
                     value={formData.sexo}
                     onChange={handleChange}
                     required
+                    style={{borderColor: !formData.sexo && error ? 'red' : ''}}
                   >
                     <option value="">Seleccionar...</option>
                     <option value="masculino">Masculino</option>
@@ -258,13 +267,14 @@ function NuevoPaciente() {
               </Col>
               <Col md={4}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Documento de Identidad</Form.Label>
+                  <Form.Label>Documento de Identidad <span style={{color: 'red'}}>*</span></Form.Label>
                   <Form.Control
                     type="text"
                     name="documento_identidad"
                     value={formData.documento_identidad}
                     onChange={handleChange}
                     required
+                    style={{borderColor: !formData.documento_identidad && error ? 'red' : ''}}
                   />
                 </Form.Group>
               </Col>
@@ -273,13 +283,14 @@ function NuevoPaciente() {
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Nacionalidad</Form.Label>
+                  <Form.Label>Nacionalidad <span style={{color: 'red'}}>*</span></Form.Label>
                   <Form.Control
                     type="text"
                     name="nacionalidad"
                     value={formData.nacionalidad}
                     onChange={handleChange}
                     required
+                    style={{borderColor: !formData.nacionalidad && error ? 'red' : ''}}
                   />
                 </Form.Group>
               </Col>
@@ -337,13 +348,14 @@ function NuevoPaciente() {
             <Row>
               <Col md={6}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Teléfono Principal</Form.Label>
+                  <Form.Label>Teléfono Principal <span style={{color: 'red'}}>*</span></Form.Label>
                   <Form.Control
                     type="tel"
                     name="telefono_principal"
                     value={formData.telefono_principal}
                     onChange={handleChange}
                     required
+                    style={{borderColor: !formData.telefono_principal && error ? 'red' : ''}}
                   />
                 </Form.Group>
               </Col>
