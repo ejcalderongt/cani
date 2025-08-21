@@ -20,8 +20,8 @@ function NotasEnfermeria() {
     fecha_fin: getLastDayOfCurrentMonth()
   });
 
-  // Configuración para hoja legal estándar
-  const CARACTERES_POR_HOJA = 2000;
+  // Configuración para hoja carta estándar (basado en análisis del PDF real)
+  const NOTAS_POR_HOJA = 10; // Máximo 10 notas por hoja según formato oficial
 
   // Función para obtener el primer día del mes actual
   function getFirstDayOfCurrentMonth() {
@@ -133,11 +133,9 @@ function NotasEnfermeria() {
           estadoPorPaciente[pacienteId] = {
             nombre: `${nota.paciente_nombre} ${nota.paciente_apellidos}`,
             expediente: nota.paciente_expediente,
-            caracteresTotales: 0,
             cantidadNotas: 0
           };
         }
-        estadoPorPaciente[pacienteId].caracteresTotales += (nota.observaciones?.length || 0);
         estadoPorPaciente[pacienteId].cantidadNotas += 1;
       }
     });
@@ -148,7 +146,7 @@ function NotasEnfermeria() {
   const getPorcentajeLlenado = (pacienteId) => {
     const estado = estadoLlenado[pacienteId];
     if (!estado) return 0;
-    return Math.min((estado.caracteresTotales / CARACTERES_POR_HOJA) * 100, 100);
+    return Math.min((estado.cantidadNotas / NOTAS_POR_HOJA) * 100, 100);
   };
 
   const getVarianteLlenado = (porcentaje) => {
@@ -295,7 +293,7 @@ function NotasEnfermeria() {
                       <strong>{estado.nombre}</strong> (Exp: {estado.expediente})
                     </small>
                     <small>
-                      {Math.round(porcentaje)}% - {estado.cantidadNotas} nota(s)
+                      {estado.cantidadNotas}/{NOTAS_POR_HOJA} notas ({Math.round(porcentaje)}%)
                     </small>
                   </div>
                   <ProgressBar
@@ -303,9 +301,9 @@ function NotasEnfermeria() {
                     variant={getVarianteLlenado(porcentaje)}
                     size="sm"
                   />
-                  {porcentaje >= 85 && (
+                  {porcentaje >= 80 && (
                     <Alert variant="warning" className="mt-2 mb-0 py-2">
-                      <small>⚠️ Hoja casi llena - Se recomienda imprimir</small>
+                      <small>⚠️ Hoja casi llena - {estado.cantidadNotas} de {NOTAS_POR_HOJA} notas</small>
                     </Alert>
                   )}
                 </div>

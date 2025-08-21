@@ -16,11 +16,12 @@ function NuevaNota() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [notasExistentes, setNotasExistentes] = useState([]);
-  const [caracteresUsados, setCaracteresUsados] = useState(0);
+  const [notasUsadas, setNotasUsadas] = useState(0);
+  const [showPreview, setShowPreview] = useState(false);
   const navigate = useNavigate();
 
-  // Configuración para hoja legal estándar
-  const CARACTERES_POR_HOJA = 2000; // Ajustado para solo observaciones
+  // Configuración para hoja carta estándar (basado en análisis del PDF real)
+  const NOTAS_POR_HOJA = 10; // Máximo 10 notas por hoja según formato oficial
   const MAX_ENTERS_CONSECUTIVOS = 2;
 
   useEffect(() => {
@@ -44,9 +45,8 @@ function NuevaNota() {
   }, [formData.paciente_id]);
 
   useEffect(() => {
-    // Calcular caracteres de la nota actual
-    const caracteresTotales = caracteresUsados + formData.observaciones.length;
-    setCaracteresUsados(caracteresTotales);
+    // El conteo se actualiza solo cuando cambia el paciente
+    // No necesitamos recalcular en tiempo real por cada carácter
   }, [formData.observaciones]);
 
   const fetchNotasPaciente = async () => {
@@ -55,26 +55,26 @@ function NuevaNota() {
       const notas = response.data.notas || [];
       setNotasExistentes(notas);
 
-      // Calcular caracteres de notas existentes del día actual
+      // Calcular número de notas del día actual
       const hoy = new Date().toISOString().split('T')[0];
       const notasHoy = notas.filter(nota => nota.fecha === hoy);
-
-      const caracteresHoy = notasHoy.reduce((total, nota) => {
-        return total + (nota.observaciones?.length || 0);
-      }, 0);
-
-      setCaracteresUsados(caracteresHoy);
+      
+      setNotasUsadas(notasHoy.length);
     } catch (error) {
       console.error('Error al cargar notas del paciente:', error);
     }
   };
 
   const calcularPorcentajeHoja = () => {
-    return Math.min((caracteresUsados / CARACTERES_POR_HOJA) * 100, 100);
+    return Math.min((notasUsadas / NOTAS_POR_HOJA) * 100, 100);
   };
 
   const debeImprimir = () => {
-    return caracteresUsados >= CARACTERES_POR_HOJA * 0.85; // 85% de capacidad
+    return notasUsadas >= NOTAS_POR_HOJA * 0.8; // 80% de capacidad (8 notas)
+  };
+
+  const generarPreview = () => {
+    window.open(`/imprimir-notas?paciente=${formData.paciente_id}&preview=true`, '_blank');
   };
 
   const controlarEnters = (texto) => {
@@ -113,10 +113,11 @@ function NuevaNota() {
 
       let successMessage = 'Nota registrada exitosamente';
       if (debeImprimir()) {
-        successMessage += '. ⚠️ ATENCIÓN: La hoja está al 85% de capacidad. Se recomienda imprimir las notas para cumplir con los requerimientos legales.';
+        successMessage += '. ⚠️ ATENCIÓN: Ya tiene 8+ notas. Se recomienda imprimir la hoja antes de continuar.';
       }
 
       setSuccess(successMessage);
+      setShowPreview(true); // Mostrar opción de previsualización
 
       // Reset form
       setFormData({
@@ -153,22 +154,45 @@ function NuevaNota() {
         </Card.Header>
         <Card.Body>
           {error && <Alert variant="danger" dismissible onClose={() => setError('')}>{error}</Alert>}
-          {success && <Alert variant={debeImprimir() ? "warning" : "success"} dismissible onClose={() => setSuccess('')}>{success}</Alert>}
+          {success && (
+            <Alert variant={debeImprimir() ? "warning" : "success"} dismissible onClose={() => {setSuccess(''); setShowPreview(false);}}>
+              {success}
+              {showPreview && (
+                <div className="mt-2">
+                  <Button 
+                    size="sm" 
+                    variant="outline-primary" 
+                    onClick={generarPreview}
+                    className="me-2"
+                  >
+                    👁️ Ver Preview de la Hoja
+                  </Button>
+                  <Button 
+                    size="sm" 
+                    variant="primary" 
+                    onClick={() => navigate('/imprimir-notas')}
+                  >
+                    📄 Ir a Imprimir
+                  </Button>
+                </div>
+              )}
+            </Alert>
+          )}
 
           {formData.paciente_id && (
             <Card className="mb-3" style={{ backgroundColor: debeImprimir() ? '#fff3cd' : '#e7f3ff' }}>
               <Card.Body className="py-2">
                 <div className="d-flex justify-content-between align-items-center mb-2">
-                  <small><strong>Capacidad de Hoja Legal (solo observaciones):</strong></small>
-                  <small>{Math.round(calcularPorcentajeHoja())}% utilizado</small>
+                  <small><strong>Capacidad de Hoja Carta (máx. 10 notas):</strong></small>
+                  <small>{notasUsadas}/{NOTAS_POR_HOJA} notas ({Math.round(calcularPorcentajeHoja())}%)</small>
                 </div>
                 <ProgressBar
                   now={calcularPorcentajeHoja()}
-                  variant={calcularPorcentajeHoja() > 85 ? "danger" : calcularPorcentajeHoja() > 60 ? "warning" : "success"}
+                  variant={calcularPorcentajeHoja() > 80 ? "danger" : calcularPorcentajeHoja() > 60 ? "warning" : "success"}
                 />
                 {debeImprimir() && (
                   <Alert variant="warning" className="mt-2 mb-0 py-2">
-                    <small>⚠️ <strong>Hoja casi llena</strong> - Se recomienda imprimir las notas antes de continuar.</small>
+                    <small>⚠️ <strong>Hoja casi llena</strong> - {notasUsadas} de {NOTAS_POR_HOJA} notas utilizadas</small>
                   </Alert>
                 )}
                 <div className="text-end mt-2">
@@ -176,9 +200,19 @@ function NuevaNota() {
                     size="sm"
                     variant="outline-primary"
                     onClick={() => navigate('/imprimir-notas')}
+                    className="me-2"
                   >
                     📄 Imprimir Notas
                   </Button>
+                  {notasUsadas > 0 && (
+                    <Button
+                      size="sm"
+                      variant="outline-info"
+                      onClick={generarPreview}
+                    >
+                      👁️ Preview Hoja
+                    </Button>
+                  )}
                 </div>
               </Card.Body>
             </Card>
@@ -248,7 +282,8 @@ function NuevaNota() {
               />
               <Form.Text className="text-muted">
                 Caracteres: {formData.observaciones.length} | 
-                Máximo 2 enters consecutivos entre observaciones
+                Máximo 2 enters consecutivos | 
+                Recuerde: máximo 10 notas por hoja carta
               </Form.Text>
             </Form.Group>
 
