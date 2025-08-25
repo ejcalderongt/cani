@@ -58,12 +58,13 @@ function NuevoPaciente() {
   };
 
   // Generate expedition number suggestion based on birth date
+  // Format: EXP + DD (day) + MM (month) + YY (year)
   const generateExpeditionNumber = (birthDate) => {
     if (!birthDate) return '';
     const date = new Date(birthDate);
-    const year = date.getFullYear().toString().slice(-2);
-    const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const year = date.getFullYear().toString().slice(-2);
     return `EXP${day}${month}${year}`;
   };
 
