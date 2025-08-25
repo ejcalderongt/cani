@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Container, Card, Form, Button, Row, Col, Alert } from 'react-bootstrap';
 import { useNavigate } from 'react-router-dom';
@@ -15,6 +14,9 @@ function NuevoPaciente() {
     nombre: '',
     apellidos: '',
     fecha_nacimiento: '',
+    dia_nacimiento: '',
+    mes_nacimiento: '',
+    year_nacimiento: '',
     sexo: '',
     documento_identidad: '',
     nacionalidad: '',
@@ -79,13 +81,25 @@ function NuevoPaciente() {
       newFormData.numero_expediente = generateExpeditionNumber(value);
     }
 
+    // Construct fecha_nacimiento from individual fields
+    if (name === 'dia_nacimiento' || name === 'mes_nacimiento' || name === 'year_nacimiento') {
+      const day = newFormData.dia_nacimiento || '01';
+      const month = newFormData.mes_nacimiento || '01';
+      const year = newFormData.year_nacimiento || '1900';
+      newFormData.fecha_nacimiento = `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      if (newFormData.fecha_nacimiento) {
+        newFormData.numero_expediente = generateExpeditionNumber(newFormData.fecha_nacimiento);
+      }
+    }
+
+
     setFormData(newFormData);
   };
 
   const validateRequiredFields = () => {
     const requiredFields = [
       'numero_expediente',
-      'nombre', 
+      'nombre',
       'apellidos',
       'fecha_nacimiento',
       'sexo',
@@ -161,6 +175,9 @@ function NuevoPaciente() {
         nombre: '',
         apellidos: '',
         fecha_nacimiento: '',
+        dia_nacimiento: '',
+        mes_nacimiento: '',
+        year_nacimiento: '',
         sexo: '',
         documento_identidad: '',
         nacionalidad: '',
@@ -293,18 +310,56 @@ function NuevoPaciente() {
             <Row>
               <Col md={4}>
                 <Form.Group className="mb-3">
-                  <Form.Label>Fecha de Nacimiento <span style={{color: 'red'}}>*</span></Form.Label>
+                  <Form.Label>Día de Nacimiento <span style={{color: 'red'}}>*</span></Form.Label>
                   <Form.Control
-                    type="date"
-                    name="fecha_nacimiento"
-                    value={formData.fecha_nacimiento}
+                    type="number"
+                    name="dia_nacimiento"
+                    value={formData.dia_nacimiento}
                     onChange={handleChange}
                     required
-                    style={{borderColor: !formData.fecha_nacimiento && error ? 'red' : ''}}
+                    min="1"
+                    max="31"
+                    placeholder="Día"
+                    style={{borderColor: !formData.dia_nacimiento && error ? 'red' : ''}}
                   />
                 </Form.Group>
               </Col>
               <Col md={4}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Mes de Nacimiento <span style={{color: 'red'}}>*</span></Form.Label>
+                  <Form.Control
+                    type="number"
+                    name="mes_nacimiento"
+                    value={formData.mes_nacimiento}
+                    onChange={handleChange}
+                    required
+                    min="1"
+                    max="12"
+                    placeholder="Mes"
+                    style={{borderColor: !formData.mes_nacimiento && error ? 'red' : ''}}
+                  />
+                </Form.Group>
+              </Col>
+              <Col md={4}>
+                <Form.Group className="mb-3">
+                  <Form.Label>Año de Nacimiento <span style={{color: 'red'}}>*</span></Form.Label>
+                  <Form.Control
+                    type="number"
+                    name="year_nacimiento"
+                    value={formData.year_nacimiento}
+                    onChange={handleChange}
+                    required
+                    min="1900"
+                    max={new Date().getFullYear()}
+                    placeholder="Año"
+                    style={{borderColor: !formData.year_nacimiento && error ? 'red' : ''}}
+                  />
+                </Form.Group>
+              </Col>
+            </Row>
+
+            <Row>
+              <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Sexo al Nacer <span style={{color: 'red'}}>*</span></Form.Label>
                   <Form.Select
@@ -320,7 +375,7 @@ function NuevoPaciente() {
                   </Form.Select>
                 </Form.Group>
               </Col>
-              <Col md={4}>
+              <Col md={6}>
                 <Form.Group className="mb-3">
                   <Form.Label>Documento de Identidad <span style={{color: 'red'}}>*</span></Form.Label>
                   <Form.Control
